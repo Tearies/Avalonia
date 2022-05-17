@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -41,7 +38,7 @@ namespace Avalonia.Markup.Data
             else
             {
 
-                if (!_entries.TryGetValue(target, out List<Entry> bindings))
+                if (!_entries.TryGetValue(target, out var bindings))
                 {
                     bindings = new List<Entry>();
                     _entries.Add(target, bindings);
@@ -68,9 +65,7 @@ namespace Avalonia.Markup.Data
             }
             else
             {
-                List<Entry> bindings;
-
-                if (!_entries.TryGetValue(target, out bindings))
+                if (!_entries.TryGetValue(target, out var bindings))
                 {
                     bindings = new List<Entry>();
                     _entries.Add(target, bindings);
@@ -89,9 +84,7 @@ namespace Avalonia.Markup.Data
         /// <param name="control">The control.</param>
         public static void ApplyBindings(IStyledElement control)
         {
-            List<Entry> entries;
-
-            if (_entries.TryGetValue(control, out entries))
+            if (_entries.TryGetValue(control, out var entries))
             {
                 foreach (var entry in entries)
                 {
@@ -102,9 +95,9 @@ namespace Avalonia.Markup.Data
             }
         }
 
-        private static void ApplyBindings(object sender, EventArgs e)
+        private static void ApplyBindings(object? sender, EventArgs e)
         {
-            var target = (IStyledElement)sender;
+            var target = (IStyledElement)sender!;
             ApplyBindings(target);
             target.Initialized -= ApplyBindings;
         }
@@ -150,8 +143,7 @@ namespace Avalonia.Markup.Data
                 }
                 catch (Exception e)
                 {
-                    Logger.Error(
-                        LogArea.Property,
+                    Logger.TryGet(LogEventLevel.Error, LogArea.Property)?.Log(
                         control,
                         "Error setting {Property} on {Target}: {Exception}",
                         Property.Name,

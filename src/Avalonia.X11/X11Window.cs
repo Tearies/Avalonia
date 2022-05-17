@@ -5,11 +5,17 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reactive.Disposables;
 using System.Text;
+using System.Threading.Tasks;
+using System.Threading;
 using Avalonia.Controls;
+using Avalonia.Controls.Platform;
 using Avalonia.Controls.Primitives.PopupPositioning;
+using Avalonia.FreeDesktop;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
+using Avalonia.Input.TextInput;
 using Avalonia.OpenGL;
+using Avalonia.OpenGL.Egl;
 using Avalonia.Platform;
 using Avalonia.Rendering;
 using Avalonia.Threading;
@@ -19,18 +25,20 @@ using static Avalonia.X11.XLib;
 // ReSharper disable StringLiteralTypo
 namespace Avalonia.X11
 {
-    unsafe class X11Window : IWindowImpl, IPopupImpl, IXI2Client
+    unsafe partial class X11Window : IWindowImpl, IPopupImpl, IXI2Client,
+        ITopLevelImplWithNativeMenuExporter,
+        ITopLevelImplWithNativeControlHost,
+        ITopLevelImplWithTextInputMethod
     {
         private readonly AvaloniaX11Platform _platform;
-        private readonly IWindowImpl _popupParent;
         private readonly bool _popup;
         private readonly X11Info _x11;
-        private bool _invalidated;
         private XConfigureEvent? _configure;
         private PixelPoint? _configurePoint;
         private bool _triggeredExpose;
         private IInputRoot _inputRoot;
-        private readonly IMouseDevice _mouse;
+        private readonly MouseDevice _mouse;
+        private readonly TouchDevice _touch;
         private readonly IKeyboardDevice _keyboard;
         private PixelPoint? _position;
         private PixelSize _realSize;
@@ -38,27 +46,22 @@ namespace Avalonia.X11
         private IntPtr _xic;
         private IntPtr _renderHandle;
         private bool _mapped;
-        private HashSet<X11Window> _transientChildren = new HashSet<X11Window>();
-        private X11Window _transientParent;
+        private bool _wasMappedAtLeastOnce = false;
         private double? _scalingOverride;
-        public object SyncRoot { get; } = new object();
-
-        class InputEventContainer
-        {
-            public RawInputEventArgs Event;
-        }
-        private readonly Queue<InputEventContainer> _inputQueue = new Queue<InputEventContainer>();
-        private InputEventContainer _lastEvent;
+        private bool _disabled;
+        private TransparencyHelper _transparencyHelper;
+        private RawEventGrouper _rawEventGrouper;
         private bool _useRenderWindow = false;
         public X11Window(AvaloniaX11Platform platform, IWindowImpl popupParent)
         {
             _platform = platform;
             _popup = popupParent != null;
             _x11 = platform.Info;
-            _mouse = platform.MouseDevice;
+            _mouse = new MouseDevice();
+            _touch = new TouchDevice();
             _keyboard = platform.KeyboardDevice;
 
-            var glfeature = AvaloniaLocator.Current.GetService<IWindowingPlatformGlFeature>();
+            var glfeature = AvaloniaLocator.Current.GetService<IPlatformOpenGlInterface>();
             XSetWindowAttributes attr = new XSetWindowAttributes();
             var valueMask = default(SetWindowValuemask);
 
@@ -71,7 +74,7 @@ namespace Avalonia.X11
 
             if (_popup)
             {
-                attr.override_redirect = true;
+                attr.override_redirect = 1;
                 valueMask |= SetWindowValuemask.OverrideRedirect;
             }
 
@@ -80,13 +83,13 @@ namespace Avalonia.X11
             // OpenGL seems to be do weird things to it's current window which breaks resize sometimes
             _useRenderWindow = glfeature != null;
             
-            var glx = glfeature as GlxGlPlatformFeature;
+            var glx = glfeature as GlxPlatformOpenGlInterface;
             if (glx != null)
                 visualInfo = *glx.Display.VisualInfo;
             else if (glfeature == null)
                 visualInfo = _x11.TransparentVisualInfo;
 
-            var egl = glfeature as EglGlPlatformFeature;
+            var egl = glfeature as EglPlatformOpenGlInterface;
             
             var visual = IntPtr.Zero;
             var depth = 24;
@@ -98,23 +101,42 @@ namespace Avalonia.X11
                 valueMask |= SetWindowValuemask.ColorMap;   
             }
 
-            _handle = XCreateWindow(_x11.Display, _x11.RootWindow, 10, 10, 300, 200, 0,
+            int defaultWidth = 0, defaultHeight = 0;
+
+            if (!_popup && Screen != null)
+            {
+                var monitor = Screen.AllScreens.OrderBy(x => x.PixelDensity)
+                   .FirstOrDefault(m => m.Bounds.Contains(Position));
+
+                if (monitor != null)
+                {
+                    // Emulate Window 7+'s default window size behavior.
+                    defaultWidth = (int)(monitor.WorkingArea.Width * 0.75d);
+                    defaultHeight = (int)(monitor.WorkingArea.Height * 0.7d);
+                }
+            }
+
+            // check if the calculated size is zero then compensate to hardcoded resolution
+            defaultWidth = Math.Max(defaultWidth, 300);
+            defaultHeight = Math.Max(defaultHeight, 200);
+
+            _handle = XCreateWindow(_x11.Display, _x11.RootWindow, 10, 10, defaultWidth, defaultHeight, 0,
                 depth,
                 (int)CreateWindowArgs.InputOutput, 
                 visual,
                 new UIntPtr((uint)valueMask), ref attr);
 
             if (_useRenderWindow)
-                _renderHandle = XCreateWindow(_x11.Display, _handle, 0, 0, 300, 200, 0, depth,
+                _renderHandle = XCreateWindow(_x11.Display, _handle, 0, 0, defaultWidth, defaultHeight, 0, depth,
                     (int)CreateWindowArgs.InputOutput,
                     visual,
                     new UIntPtr((uint)(SetWindowValuemask.BorderPixel | SetWindowValuemask.BitGravity |
                                        SetWindowValuemask.WinGravity | SetWindowValuemask.BackingStore)), ref attr);
             else
                 _renderHandle = _handle;
-                
-            Handle = new PlatformHandle(_handle, "XID");
-            _realSize = new PixelSize(300, 200);
+
+            Handle = new SurfacePlatformHandle(this);
+            _realSize = new PixelSize(defaultWidth, defaultHeight);
             platform.Windows[_handle] = OnEvent;
             XEventMask ignoredMask = XEventMask.SubstructureRedirectMask
                                      | XEventMask.ResizeRedirectMask
@@ -137,24 +159,37 @@ namespace Avalonia.X11
             var surfaces = new List<object>
             {
                 new X11FramebufferSurface(_x11.DeferredDisplay, _renderHandle, 
-                   depth, () => Scaling)
+                   depth, () => RenderScaling)
             };
             
             if (egl != null)
                 surfaces.Insert(0,
-                    new EglGlPlatformSurface((EglDisplay)egl.Display, egl.DeferredContext,
+                    new EglGlPlatformSurface(egl,
                         new SurfaceInfo(this, _x11.DeferredDisplay, _handle, _renderHandle)));
             if (glx != null)
                 surfaces.Insert(0, new GlxGlPlatformSurface(glx.Display, glx.DeferredContext,
                     new SurfaceInfo(this, _x11.Display, _handle, _renderHandle)));
-            
+
+            surfaces.Add(Handle);
+
             Surfaces = surfaces.ToArray();
             UpdateMotifHints();
-            _xic = XCreateIC(_x11.Xim, XNames.XNInputStyle, XIMProperties.XIMPreeditNothing | XIMProperties.XIMStatusNothing,
-                XNames.XNClientWindow, _handle, IntPtr.Zero);
+            UpdateSizeHints(null);
+
+            _rawEventGrouper = new RawEventGrouper(e => Input?.Invoke(e));
+            
+            _transparencyHelper = new TransparencyHelper(_x11, _handle, platform.Globals);
+            _transparencyHelper.SetTransparencyRequest(WindowTransparencyLevel.None);
+
+            CreateIC();
+
             XFlush(_x11.Display);
             if(_popup)
                 PopupPositioner = new ManagedPopupPositioner(new ManagedPopupPositionerPopupImplHelper(popupParent, MoveResize));
+            if (platform.Options.UseDBusMenu)
+                NativeMenuExporter = DBusMenuExporter.TryCreateTopLevelNativeMenu(_handle);
+            NativeControlHost = new X11NativeControlHost(_platform, this);
+            InitializeIme();
         }
 
         class SurfaceInfo  : EglGlPlatformSurface.IEglWindowGlPlatformSurfaceInfo
@@ -184,7 +219,7 @@ namespace Avalonia.X11
                 }
             }
 
-            public double Scaling => _window.Scaling;
+            public double Scaling => _window.RenderScaling;
         }
 
         void UpdateMotifHints()
@@ -194,10 +229,9 @@ namespace Avalonia.X11
             var decorations = MotifDecorations.Menu | MotifDecorations.Title | MotifDecorations.Border |
                               MotifDecorations.Maximize | MotifDecorations.Minimize | MotifDecorations.ResizeH;
 
-            if (_popup || !_systemDecorations)
-            {
+            if (_popup 
+                || _systemDecorations == SystemDecorations.None) 
                 decorations = 0;
-            }
 
             if (!_canResize)
             {
@@ -252,44 +286,91 @@ namespace Avalonia.X11
             XSetWMNormalHints(_x11.Display, _handle, ref hints);
         }
 
-        public Size ClientSize => new Size(_realSize.Width / Scaling, _realSize.Height / Scaling);
+        public Size ClientSize => new Size(_realSize.Width / RenderScaling, _realSize.Height / RenderScaling);
 
-        public double Scaling
+        public Size? FrameSize
         {
             get
             {
-                lock (SyncRoot)
-                    return _scaling;
+                XGetWindowProperty(_x11.Display, _handle, _x11.Atoms._NET_FRAME_EXTENTS, IntPtr.Zero,
+                    new IntPtr(4), false, (IntPtr)Atom.AnyPropertyType, out var _,
+                    out var _, out var nitems, out var _, out var prop);
 
+                if (nitems.ToInt64() != 4)
+                {
+                    // Window hasn't been mapped by the WM yet, so can't get the extents.
+                    return null;
+                }
+
+                var data = (IntPtr*)prop.ToPointer();
+                var extents = new Thickness(data[0].ToInt32(), data[2].ToInt32(), data[1].ToInt32(), data[3].ToInt32());
+                XFree(prop);
+                
+                return new Size(
+                    (_realSize.Width + extents.Left + extents.Right) / RenderScaling,
+                    (_realSize.Height + extents.Top + extents.Bottom) / RenderScaling);
             }
-            private set => _scaling = value;
         }
+
+        public double RenderScaling
+        {
+            get => Interlocked.CompareExchange(ref _scaling, 0.0, 0.0); 
+            private set => Interlocked.Exchange(ref _scaling, value); 
+        }
+        
+        public double DesktopScaling => RenderScaling;
 
         public IEnumerable<object> Surfaces { get; }
         public Action<RawInputEventArgs> Input { get; set; }
         public Action<Rect> Paint { get; set; }
-        public Action<Size> Resized { get; set; }
+        public Action<Size, PlatformResizeReason> Resized { get; set; }
         //TODO
         public Action<double> ScalingChanged { get; set; }
         public Action Deactivated { get; set; }
         public Action Activated { get; set; }
         public Func<bool> Closing { get; set; }
         public Action<WindowState> WindowStateChanged { get; set; }
+
+        public Action<WindowTransparencyLevel> TransparencyLevelChanged
+        {
+            get => _transparencyHelper?.TransparencyLevelChanged;
+            set
+            {
+                if (_transparencyHelper != null)
+                    _transparencyHelper.TransparencyLevelChanged = value;
+            }
+        }
+
+        public Action<bool> ExtendClientAreaToDecorationsChanged { get; set; }
+
+        public Thickness ExtendedMargins { get; } = new Thickness();
+
+        public Thickness OffScreenMargin { get; } = new Thickness();
+
+        public bool IsClientAreaExtendedToDecorations { get; }
+
         public Action Closed { get; set; }
         public Action<PixelPoint> PositionChanged { get; set; }
+        public Action LostFocus { get; set; }
 
-        public IRenderer CreateRenderer(IRenderRoot root) =>
-            new DeferredRenderer(root, AvaloniaLocator.Current.GetService<IRenderLoop>());
-
-        void OnEvent(XEvent ev)
+        public IRenderer CreateRenderer(IRenderRoot root)
         {
-            lock (SyncRoot)
-                OnEventSync(ev);
+            var loop = AvaloniaLocator.Current.GetService<IRenderLoop>();
+            var customRendererFactory = AvaloniaLocator.Current.GetService<IRendererFactory>();
+
+            if (customRendererFactory != null)
+                return customRendererFactory.Create(root, loop);
+            
+            return _platform.Options.UseDeferredRendering ?
+                new DeferredRenderer(root, loop)
+                {
+                    RenderOnlyOnRenderThread = true
+                } :
+                (IRenderer)new X11ImmediateRendererProxy(root, loop);
         }
-        void OnEventSync(XEvent ev)
+
+        void OnEvent(ref XEvent ev)
         {
-            if(XFilterEvent(ref ev, _handle))
-                return;
             if (ev.type == XEventName.MapNotify)
             {
                 _mapped = true;
@@ -298,7 +379,9 @@ namespace Avalonia.X11
             }
             else if (ev.type == XEventName.UnmapNotify)
                 _mapped = false;
-            else if (ev.type == XEventName.Expose)
+            else if (ev.type == XEventName.Expose ||
+                     (ev.type == XEventName.VisibilityNotify &&
+                      ev.VisibilityEvent.state < 2))
             {
                 if (!_triggeredExpose)
                 {
@@ -315,9 +398,13 @@ namespace Avalonia.X11
                 if (ActivateTransientChildIfNeeded())
                     return;
                 Activated?.Invoke();
+                _imeControl?.SetWindowActive(true);
             }
             else if (ev.type == XEventName.FocusOut)
+            {
+                _imeControl?.SetWindowActive(false);
                 Deactivated?.Invoke();
+            }
             else if (ev.type == XEventName.MotionNotify)
                 MouseEvent(RawPointerEventType.Move, ref ev, ev.MotionEvent.state);
             else if (ev.type == XEventName.LeaveNotify)
@@ -330,10 +417,17 @@ namespace Avalonia.X11
             {
                 if (ActivateTransientChildIfNeeded())
                     return;
-                if (ev.ButtonEvent.button < 4)
-                    MouseEvent(ev.ButtonEvent.button == 1 ? RawPointerEventType.LeftButtonDown
-                        : ev.ButtonEvent.button == 2 ? RawPointerEventType.MiddleButtonDown
-                        : RawPointerEventType.RightButtonDown, ref ev, ev.ButtonEvent.state);
+                if (ev.ButtonEvent.button < 4 || ev.ButtonEvent.button == 8 || ev.ButtonEvent.button == 9)
+                    MouseEvent(
+                        ev.ButtonEvent.button switch
+                        {
+                            1 => RawPointerEventType.LeftButtonDown,
+                            2 => RawPointerEventType.MiddleButtonDown,
+                            3 => RawPointerEventType.RightButtonDown,
+                            8 => RawPointerEventType.XButton1Down,
+                            9 => RawPointerEventType.XButton2Down
+                        },
+                        ref ev, ev.ButtonEvent.state);
                 else
                 {
                     var delta = ev.ButtonEvent.button == 4
@@ -351,10 +445,17 @@ namespace Avalonia.X11
             }
             else if (ev.type == XEventName.ButtonRelease)
             {
-                if (ev.ButtonEvent.button < 4)
-                    MouseEvent(ev.ButtonEvent.button == 1 ? RawPointerEventType.LeftButtonUp
-                        : ev.ButtonEvent.button == 2 ? RawPointerEventType.MiddleButtonUp
-                        : RawPointerEventType.RightButtonUp, ref ev, ev.ButtonEvent.state);
+                if (ev.ButtonEvent.button < 4 || ev.ButtonEvent.button == 8 || ev.ButtonEvent.button == 9)
+                    MouseEvent(
+                        ev.ButtonEvent.button switch
+                        {
+                            1 => RawPointerEventType.LeftButtonUp,
+                            2 => RawPointerEventType.MiddleButtonUp,
+                            3 => RawPointerEventType.RightButtonUp,
+                            8 => RawPointerEventType.XButton1Up,
+                            9 => RawPointerEventType.XButton2Up
+                        },
+                        ref ev, ev.ButtonEvent.state);
             }
             else if (ev.type == XEventName.ConfigureNotify)
             {
@@ -362,7 +463,7 @@ namespace Avalonia.X11
                     return;
                 var needEnqueue = (_configure == null);
                 _configure = ev.ConfigureEvent;
-                if (ev.ConfigureEvent.override_redirect || ev.ConfigureEvent.send_event)
+                if (ev.ConfigureEvent.override_redirect != 0  || ev.ConfigureEvent.send_event != 0)
                     _configurePoint = new PixelPoint(ev.ConfigureEvent.x, ev.ConfigureEvent.y);
                 else
                 {
@@ -392,9 +493,10 @@ namespace Avalonia.X11
                             PositionChanged?.Invoke(npos);
                             updatedSizeViaScaling = UpdateScaling();
                         }
+                        UpdateImePosition();
 
-                        if (changedSize && !updatedSizeViaScaling)
-                            Resized?.Invoke(ClientSize);
+                        if (changedSize && !updatedSizeViaScaling && !_popup)
+                            Resized?.Invoke(ClientSize, PlatformResizeReason.Unspecified);
 
                         Dispatcher.UIThread.RunJobs(DispatcherPriority.Layout);
                     }, DispatcherPriority.Layout);
@@ -402,7 +504,8 @@ namespace Avalonia.X11
                     XConfigureResizeWindow(_x11.Display, _renderHandle, ev.ConfigureEvent.width,
                         ev.ConfigureEvent.height);
             }
-            else if (ev.type == XEventName.DestroyNotify && ev.AnyEvent.window == _handle)
+            else if (ev.type == XEventName.DestroyNotify 
+                     && ev.DestroyWindowEvent.window == _handle)
             {
                 Cleanup();
             }
@@ -422,69 +525,35 @@ namespace Avalonia.X11
             {
                 if (ActivateTransientChildIfNeeded())
                     return;
-                var buffer = stackalloc byte[40];
-
-                var index = ev.KeyEvent.state.HasFlag(XModifierMask.ShiftMask);
-                
-                // We need the latin key, since it's mainly used for hotkeys, we use a different API for text anyway
-                var key = (X11Key)XKeycodeToKeysym(_x11.Display, ev.KeyEvent.keycode, index ? 1 : 0).ToInt32();
-                
-                // Manually switch the Shift index for the keypad,
-                // there should be a proper way to do this
-                if (ev.KeyEvent.state.HasFlag(XModifierMask.Mod2Mask)
-                    && key > X11Key.Num_Lock && key <= X11Key.KP_9)
-                    key = (X11Key)XKeycodeToKeysym(_x11.Display, ev.KeyEvent.keycode, index ? 0 : 1).ToInt32();
-                
-                
-                ScheduleInput(new RawKeyEventArgs(_keyboard, (ulong)ev.KeyEvent.time.ToInt64(),
-                    ev.type == XEventName.KeyPress ? RawKeyEventType.KeyDown : RawKeyEventType.KeyUp,
-                    X11KeyTransform.ConvertKey(key), TranslateModifiers(ev.KeyEvent.state)), ref ev);
-
-                if (ev.type == XEventName.KeyPress)
-                {
-                    var len = Xutf8LookupString(_xic, ref ev, buffer, 40, out _, out _);
-                    if (len != 0)
-                    {
-                        var text = Encoding.UTF8.GetString(buffer, len);
-                        if (text.Length == 1)
-                        {
-                            if (text[0] < ' ' || text[0] == 0x7f) //Control codes or DEL
-                                return;
-                        }
-                        ScheduleInput(new RawTextInputEventArgs(_keyboard, (ulong)ev.KeyEvent.time.ToInt64(), text),
-                            ref ev);
-                    }
-                }
+                HandleKeyEvent(ref ev);
             }
         }
 
         private bool UpdateScaling(bool skipResize = false)
         {
-            lock (SyncRoot)
+            double newScaling;
+            if (_scalingOverride.HasValue)
+                newScaling = _scalingOverride.Value;
+            else
             {
-                double newScaling;
-                if (_scalingOverride.HasValue)
-                    newScaling = _scalingOverride.Value;
-                else
-                {
-                    var monitor = _platform.X11Screens.Screens.OrderBy(x => x.PixelDensity)
-                        .FirstOrDefault(m => m.Bounds.Contains(Position));
-                    newScaling = monitor?.PixelDensity ?? Scaling;
-                }
-
-                if (Scaling != newScaling)
-                {
-                    var oldScaledSize = ClientSize;
-                    Scaling = newScaling;
-                    ScalingChanged?.Invoke(Scaling);
-                    SetMinMaxSize(_scaledMinMaxSize.minSize, _scaledMinMaxSize.maxSize);
-                    if(!skipResize)
-                        Resize(oldScaledSize, true);
-                    return true;
-                }
-
-                return false;
+                var monitor = _platform.X11Screens.Screens.OrderBy(x => x.PixelDensity)
+                    .FirstOrDefault(m => m.Bounds.Contains(Position));
+                newScaling = monitor?.PixelDensity ?? RenderScaling;
             }
+
+            if (RenderScaling != newScaling)
+            {
+                var oldScaledSize = ClientSize;
+                RenderScaling = newScaling;
+                ScalingChanged?.Invoke(RenderScaling);
+                UpdateImePosition();
+                SetMinMaxSize(_scaledMinMaxSize.minSize, _scaledMinMaxSize.maxSize);
+                if(!skipResize)
+                    Resize(oldScaledSize, true, PlatformResizeReason.DpiChange);
+                return true;
+            }
+            
+            return false;
         }
 
         private WindowState _lastWindowState;
@@ -502,14 +571,23 @@ namespace Avalonia.X11
                 }
                 else if (value == WindowState.Maximized)
                 {
-                    SendNetWMMessage(_x11.Atoms._NET_WM_STATE, (IntPtr)0, _x11.Atoms._NET_WM_STATE_HIDDEN, IntPtr.Zero);
-                    SendNetWMMessage(_x11.Atoms._NET_WM_STATE, (IntPtr)1, _x11.Atoms._NET_WM_STATE_MAXIMIZED_VERT,
+                    ChangeWMAtoms(false, _x11.Atoms._NET_WM_STATE_HIDDEN);
+                    ChangeWMAtoms(false, _x11.Atoms._NET_WM_STATE_FULLSCREEN);
+                    ChangeWMAtoms(true, _x11.Atoms._NET_WM_STATE_MAXIMIZED_VERT,
+                        _x11.Atoms._NET_WM_STATE_MAXIMIZED_HORZ);
+                }
+                else if (value == WindowState.FullScreen)
+                {
+                    ChangeWMAtoms(false, _x11.Atoms._NET_WM_STATE_HIDDEN);
+                    ChangeWMAtoms(true, _x11.Atoms._NET_WM_STATE_FULLSCREEN);
+                    ChangeWMAtoms(false, _x11.Atoms._NET_WM_STATE_MAXIMIZED_VERT,
                         _x11.Atoms._NET_WM_STATE_MAXIMIZED_HORZ);
                 }
                 else
                 {
-                    SendNetWMMessage(_x11.Atoms._NET_WM_STATE, (IntPtr)0, _x11.Atoms._NET_WM_STATE_HIDDEN, IntPtr.Zero);
-                    SendNetWMMessage(_x11.Atoms._NET_WM_STATE, (IntPtr)0, _x11.Atoms._NET_WM_STATE_MAXIMIZED_VERT,
+                    ChangeWMAtoms(false, _x11.Atoms._NET_WM_STATE_HIDDEN);
+                    ChangeWMAtoms(false, _x11.Atoms._NET_WM_STATE_FULLSCREEN);
+                    ChangeWMAtoms(false, _x11.Atoms._NET_WM_STATE_MAXIMIZED_VERT,
                         _x11.Atoms._NET_WM_STATE_MAXIMIZED_HORZ);
                 }
             }
@@ -517,6 +595,13 @@ namespace Avalonia.X11
 
         private void OnPropertyChange(IntPtr atom, bool hasValue)
         {
+            if (atom == _x11.Atoms._NET_FRAME_EXTENTS)
+            {
+                // Occurs once the window has been mapped, which is the earliest the extents
+                // can be retrieved, so invoke event to force update of TopLevel.FrameSize.
+                Resized.Invoke(ClientSize, PlatformResizeReason.Unspecified);
+            }
+
             if (atom == _x11.Atoms._NET_WM_STATE)
             {
                 WindowState state = WindowState.Normal;
@@ -533,6 +618,12 @@ namespace Avalonia.X11
                         if (pitems[c] == _x11.Atoms._NET_WM_STATE_HIDDEN)
                         {
                             state = WindowState.Minimized;
+                            break;
+                        }
+
+                        if(pitems[c] == _x11.Atoms._NET_WM_STATE_FULLSCREEN)
+                        {
+                            state = WindowState.FullScreen;
                             break;
                         }
 
@@ -561,24 +652,28 @@ namespace Avalonia.X11
         RawInputModifiers TranslateModifiers(XModifierMask state)
         {
             var rv = default(RawInputModifiers);
-            if (state.HasFlag(XModifierMask.Button1Mask))
+            if (state.HasAllFlags(XModifierMask.Button1Mask))
                 rv |= RawInputModifiers.LeftMouseButton;
-            if (state.HasFlag(XModifierMask.Button2Mask))
+            if (state.HasAllFlags(XModifierMask.Button2Mask))
                 rv |= RawInputModifiers.RightMouseButton;
-            if (state.HasFlag(XModifierMask.Button2Mask))
+            if (state.HasAllFlags(XModifierMask.Button3Mask))
                 rv |= RawInputModifiers.MiddleMouseButton;
-            if (state.HasFlag(XModifierMask.ShiftMask))
+            if (state.HasAllFlags(XModifierMask.Button4Mask))
+                rv |= RawInputModifiers.XButton1MouseButton;
+            if (state.HasAllFlags(XModifierMask.Button5Mask))
+                rv |= RawInputModifiers.XButton2MouseButton;
+            if (state.HasAllFlags(XModifierMask.ShiftMask))
                 rv |= RawInputModifiers.Shift;
-            if (state.HasFlag(XModifierMask.ControlMask))
+            if (state.HasAllFlags(XModifierMask.ControlMask))
                 rv |= RawInputModifiers.Control;
-            if (state.HasFlag(XModifierMask.Mod1Mask))
+            if (state.HasAllFlags(XModifierMask.Mod1Mask))
                 rv |= RawInputModifiers.Alt;
-            if (state.HasFlag(XModifierMask.Mod4Mask))
+            if (state.HasAllFlags(XModifierMask.Mod4Mask))
                 rv |= RawInputModifiers.Meta;
             return rv;
         }
         
-        private bool _systemDecorations = true;
+        private SystemDecorations _systemDecorations = SystemDecorations.Full;
         private bool _canResize = true;
         private const int MaxWindowDimension = 100000;
 
@@ -595,60 +690,54 @@ namespace Avalonia.X11
             _x11.LastActivityTimestamp = xev.ButtonEvent.time;
             ScheduleInput(args);
         }
+        
 
-        public void ScheduleInput(RawInputEventArgs args)
+        public void ScheduleXI2Input(RawInputEventArgs args)
+        {
+            if (args is RawPointerEventArgs pargs)
+            {
+                if ((pargs.Type == RawPointerEventType.TouchBegin
+                     || pargs.Type == RawPointerEventType.TouchUpdate
+                     || pargs.Type == RawPointerEventType.LeftButtonDown
+                     || pargs.Type == RawPointerEventType.RightButtonDown
+                     || pargs.Type == RawPointerEventType.MiddleButtonDown
+                     || pargs.Type == RawPointerEventType.NonClientLeftButtonDown)
+                    && ActivateTransientChildIfNeeded())
+                    return;
+                if (pargs.Type == RawPointerEventType.TouchEnd
+                    && ActivateTransientChildIfNeeded())
+                    pargs.Type = RawPointerEventType.TouchCancel;
+            }
+
+            ScheduleInput(args);
+        }
+        
+        private void ScheduleInput(RawInputEventArgs args)
         {
             if (args is RawPointerEventArgs mouse)
-                mouse.Position = mouse.Position / Scaling;
+                mouse.Position = mouse.Position / RenderScaling;
             if (args is RawDragEvent drag)
-                drag.Location = drag.Location / Scaling;
+                drag.Location = drag.Location / RenderScaling;
             
-            _lastEvent = new InputEventContainer() {Event = args};
-            _inputQueue.Enqueue(_lastEvent);
-            if (_inputQueue.Count == 1)
-            {
-                Dispatcher.UIThread.Post(() =>
-                {
-                    while (_inputQueue.Count > 0)
-                    {
-                        Dispatcher.UIThread.RunJobs(DispatcherPriority.Input + 1);
-                        var ev = _inputQueue.Dequeue();
-                        Input?.Invoke(ev.Event);
-                    }
-                }, DispatcherPriority.Input);
-            }
+            _rawEventGrouper.HandleEvent(args);
         }
         
         void MouseEvent(RawPointerEventType type, ref XEvent ev, XModifierMask mods)
         {
             var mev = new RawPointerEventArgs(
                 _mouse, (ulong)ev.ButtonEvent.time.ToInt64(), _inputRoot,
-                type, new Point(ev.ButtonEvent.x, ev.ButtonEvent.y), TranslateModifiers(mods)); 
-            if(type == RawPointerEventType.Move && _inputQueue.Count>0 && _lastEvent.Event is RawPointerEventArgs ma)
-                if (ma.Type == RawPointerEventType.Move)
-                {
-                    _lastEvent.Event = mev;
-                    return;
-                }
+                type, new Point(ev.ButtonEvent.x, ev.ButtonEvent.y), TranslateModifiers(mods));
             ScheduleInput(mev, ref ev);
         }
 
         void DoPaint()
         {
-            _invalidated = false;
             Paint?.Invoke(new Rect());
         }
         
         public void Invalidate(Rect rect)
         {
-            if(_invalidated)
-                return;
-            _invalidated = true;
-            Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                if (_mapped)
-                    DoPaint();
-            });
+
         }
 
         public IInputRoot InputRoot => _inputRoot;
@@ -660,16 +749,30 @@ namespace Avalonia.X11
 
         public void Dispose()
         {
-            if (_handle != IntPtr.Zero)
-            {
-                XDestroyWindow(_x11.Display, _handle);
-                Cleanup();
-            }
+            Cleanup();            
         }
 
         void Cleanup()
         {
-            SetTransientParent(null, false);
+            if (_rawEventGrouper != null)
+            {
+                _rawEventGrouper.Dispose();
+                _rawEventGrouper = null;
+            }
+            
+            if (_transparencyHelper != null)
+            {
+                _transparencyHelper.Dispose();
+                _transparencyHelper = null;
+            }
+            
+            if (_imeControl != null)
+            {
+                _imeControl.Dispose();
+                _imeControl = null;
+                _ime = null;
+            }
+            
             if (_xic != IntPtr.Zero)
             {
                 XDestroyIC(_xic);
@@ -678,80 +781,77 @@ namespace Avalonia.X11
             
             if (_handle != IntPtr.Zero)
             {
-                XDestroyWindow(_x11.Display, _handle);
                 _platform.Windows.Remove(_handle);
                 _platform.XI2?.OnWindowDestroyed(_handle);
+                var handle = _handle;
                 _handle = IntPtr.Zero;
                 Closed?.Invoke();
+                _mouse.Dispose();
+                _touch.Dispose();
+                XDestroyWindow(_x11.Display, handle);
             }
             
             if (_useRenderWindow && _renderHandle != IntPtr.Zero)
-            {
-                XDestroyWindow(_x11.Display, _renderHandle);
+            {                
                 _renderHandle = IntPtr.Zero;
             }
         }
 
         bool ActivateTransientChildIfNeeded()
         {
-            if (_transientChildren.Count == 0)
-                return false;
-            var child = _transientChildren.First();
-            if (!child.ActivateTransientChildIfNeeded())
-                child.Activate();
-            return true;
-        }
-        
-        void SetTransientParent(X11Window window, bool informServer = true)
-        {
-            _transientParent?._transientChildren.Remove(this);
-            _transientParent = window;
-            _transientParent?._transientChildren.Add(this);
-            if (informServer)
-                XSetTransientForHint(_x11.Display, _handle, _transientParent?._handle ?? IntPtr.Zero);
+            if (_disabled)
+            {
+                GotInputWhenDisabled?.Invoke();
+                return true;
+            }
+
+            return false;
         }
 
-        public void Show()
+        public void SetParent(IWindowImpl parent)
         {
-            SetTransientParent(null);
-            ShowCore();
+            if (parent == null || parent.Handle == null || parent.Handle.Handle == IntPtr.Zero)
+                XDeleteProperty(_x11.Display, _handle, _x11.Atoms.XA_WM_TRANSIENT_FOR);
+            else
+                XSetTransientForHint(_x11.Display, _handle, parent.Handle.Handle);
         }
-        
-        void ShowCore()
+
+        public void Show(bool activate, bool isDialog)
         {
+            _wasMappedAtLeastOnce = true;
             XMapWindow(_x11.Display, _handle);
             XFlush(_x11.Display);
         }
 
         public void Hide() => XUnmapWindow(_x11.Display, _handle);
         
-        
-        public Point PointToClient(PixelPoint point) => new Point((point.X - Position.X) / Scaling, (point.Y - Position.Y) / Scaling);
+        public Point PointToClient(PixelPoint point) => new Point((point.X - Position.X) / RenderScaling, (point.Y - Position.Y) / RenderScaling);
 
         public PixelPoint PointToScreen(Point point) => new PixelPoint(
-            (int)(point.X * Scaling + Position.X),
-            (int)(point.Y * Scaling + Position.Y));
+            (int)(point.X * RenderScaling + Position.X),
+            (int)(point.Y * RenderScaling + Position.Y));
         
-        public void SetSystemDecorations(bool enabled)
+        public void SetSystemDecorations(SystemDecorations enabled)
         {
-            _systemDecorations = enabled;
+            _systemDecorations = enabled == SystemDecorations.Full ? SystemDecorations.Full : SystemDecorations.None;
             UpdateMotifHints();
+            UpdateSizeHints(null);
         }
 
 
-        public void Resize(Size clientSize) => Resize(clientSize, false);
+        public void Resize(Size clientSize, PlatformResizeReason reason) => Resize(clientSize, false, reason);
         public void Move(PixelPoint point) => Position = point;
         private void MoveResize(PixelPoint position, Size size, double scaling)
         {
             Move(position);
             _scalingOverride = scaling;
             UpdateScaling(true);
-            Resize(size, true);
+            Resize(size, true, PlatformResizeReason.Layout);
         }
 
-        PixelSize ToPixelSize(Size size) => new PixelSize((int)(size.Width * Scaling), (int)(size.Height * Scaling));
+        PixelSize ToPixelSize(Size size) => new PixelSize((int)(size.Width * RenderScaling), (int)(size.Height * RenderScaling));
         
-        void Resize(Size clientSize, bool force)
+        void Resize(Size clientSize, bool force, PlatformResizeReason reason)
         {
             if (!force && clientSize == ClientSize)
                 return;
@@ -765,10 +865,10 @@ namespace Avalonia.X11
                 XConfigureResizeWindow(_x11.Display, _renderHandle, pixelSize);
             XFlush(_x11.Display);
 
-            if (force || (_popup && needImmediatePopupResize))
+            if (force || !_wasMappedAtLeastOnce || (_popup && needImmediatePopupResize))
             {
                 _realSize = pixelSize;
-                Resized?.Invoke(ClientSize);
+                Resized?.Invoke(ClientSize, reason);
             }
         }
         
@@ -779,15 +879,13 @@ namespace Avalonia.X11
             UpdateSizeHints(null);
         }
 
-        public void SetCursor(IPlatformHandle cursor)
+        public void SetCursor(ICursorImpl cursor)
         {
             if (cursor == null)
                 XDefineCursor(_x11.Display, _handle, _x11.DefaultCursor);
-            else
+            else if (cursor is CursorImpl impl)
             {
-                if (cursor.HandleDescriptor != "XCURSOR")
-                    throw new ArgumentException("Expected XCURSOR handle type");
-                XDefineCursor(_x11.Display, _handle, cursor.Handle);
+                XDefineCursor(_x11.Display, _handle, impl.Handle);
             }
         }
 
@@ -806,11 +904,18 @@ namespace Avalonia.X11
                 XConfigureWindow(_x11.Display, _handle, ChangeWindowFlags.CWX | ChangeWindowFlags.CWY,
                     ref changes);
                 XFlush(_x11.Display);
+                if (!_wasMappedAtLeastOnce)
+                {
+                    _position = value;
+                    PositionChanged?.Invoke(value);
+                }
 
             }
         }
 
         public IMouseDevice MouseDevice => _mouse;
+        public TouchDevice TouchDevice => _touch;
+
         public IPopupImpl CreatePopup() 
             => _platform.Options.OverlayPopups ? null : new X11Window(_platform, this);
 
@@ -831,7 +936,7 @@ namespace Avalonia.X11
 
         public IScreenImpl Screen => _platform.Screens;
 
-        public Size MaxClientSize => _platform.X11Screens.Screens.Select(s => s.Bounds.Size.ToSize(s.PixelDensity))
+        public Size MaxAutoSizeHint => _platform.X11Screens.Screens.Select(s => s.Bounds.Size.ToSize(s.PixelDensity))
             .OrderByDescending(x => x.Width + x.Height).FirstOrDefault();
 
 
@@ -843,7 +948,7 @@ namespace Avalonia.X11
                 ClientMessageEvent =
                 {
                     type = XEventName.ClientMessage,
-                    send_event = true,
+                    send_event = 1,
                     window = _handle,
                     message_type = message_type,
                     format = 32,
@@ -859,21 +964,23 @@ namespace Avalonia.X11
 
         }
 
-        void BeginMoveResize(NetWmMoveResize side)
+        void BeginMoveResize(NetWmMoveResize side, PointerPressedEventArgs e)
         {
             var pos = GetCursorPos(_x11);
             XUngrabPointer(_x11.Display, new IntPtr(0));
             SendNetWMMessage (_x11.Atoms._NET_WM_MOVERESIZE, (IntPtr) pos.x, (IntPtr) pos.y,
                 (IntPtr) side,
                 (IntPtr) 1, (IntPtr)1); // left button
+                
+            e.Pointer.Capture(null);
         }
 
-        public void BeginMoveDrag()
+        public void BeginMoveDrag(PointerPressedEventArgs e)
         {
-            BeginMoveResize(NetWmMoveResize._NET_WM_MOVERESIZE_MOVE);
+            BeginMoveResize(NetWmMoveResize._NET_WM_MOVERESIZE_MOVE, e);
         }
 
-        public void BeginResizeDrag(WindowEdge edge)
+        public void BeginResizeDrag(WindowEdge edge, PointerPressedEventArgs e)
         {
             var side = NetWmMoveResize._NET_WM_MOVERESIZE_CANCEL;
             if (edge == WindowEdge.East)
@@ -892,17 +999,25 @@ namespace Avalonia.X11
                 side = NetWmMoveResize._NET_WM_MOVERESIZE_SIZE_BOTTOMRIGHT;
             if (edge == WindowEdge.SouthWest)
                 side = NetWmMoveResize._NET_WM_MOVERESIZE_SIZE_BOTTOMLEFT;
-            BeginMoveResize(side);
+            BeginMoveResize(side, e);
         }
-        
+
         public void SetTitle(string title)
         {
-            var data = Encoding.UTF8.GetBytes(title);
-            fixed (void* pdata = data)
+            if (string.IsNullOrEmpty(title))
             {
-                XChangeProperty(_x11.Display, _handle, _x11.Atoms._NET_WM_NAME, _x11.Atoms.UTF8_STRING, 8,
-                    PropertyMode.Replace, pdata, data.Length);
-                XStoreName(_x11.Display, _handle, title);
+                XDeleteProperty(_x11.Display, _handle, _x11.Atoms._NET_WM_NAME);
+                XDeleteProperty(_x11.Display, _handle, _x11.Atoms.XA_WM_NAME);
+            }
+            else
+            {
+                var data = Encoding.UTF8.GetBytes(title);
+                fixed (void* pdata = data)
+                {
+                    XChangeProperty(_x11.Display, _handle, _x11.Atoms._NET_WM_NAME, _x11.Atoms.UTF8_STRING, 8,
+                        PropertyMode.Replace, pdata, data.Length);
+                    XStoreName(_x11.Display, _handle, title);
+                }
             }
         }
 
@@ -920,13 +1035,13 @@ namespace Avalonia.X11
         {
             _scaledMinMaxSize = (minSize, maxSize);
             var min = new PixelSize(
-                (int)(minSize.Width < 1 ? 1 : minSize.Width * Scaling),
-                (int)(minSize.Height < 1 ? 1 : minSize.Height * Scaling));
+                (int)(minSize.Width < 1 ? 1 : minSize.Width * RenderScaling),
+                (int)(minSize.Height < 1 ? 1 : minSize.Height * RenderScaling));
 
             const int maxDim = MaxWindowDimension;
             var max = new PixelSize(
-                (int)(maxSize.Width > maxDim ? maxDim : Math.Max(min.Width, maxSize.Width * Scaling)),
-                (int)(maxSize.Height > maxDim ? maxDim : Math.Max(min.Height, maxSize.Height * Scaling)));
+                (int)(maxSize.Width > maxDim ? maxDim : Math.Max(min.Width, maxSize.Width * RenderScaling)),
+                (int)(maxSize.Height > maxDim ? maxDim : Math.Max(min.Height, maxSize.Height * RenderScaling)));
             
             _minMaxSize = (min, max);
             UpdateSizeHints(null);
@@ -934,31 +1049,118 @@ namespace Avalonia.X11
 
         public void SetTopmost(bool value)
         {
-            SendNetWMMessage(_x11.Atoms._NET_WM_STATE,
-                (IntPtr)(value ? 1 : 0), _x11.Atoms._NET_WM_STATE_ABOVE, IntPtr.Zero);
+            ChangeWMAtoms(value, _x11.Atoms._NET_WM_STATE_ABOVE);
+        }
+        
+        public void SetEnabled(bool enable)
+        {
+            _disabled = !enable;
         }
 
-        public void ShowDialog(IWindowImpl parent)
+        public void SetExtendClientAreaToDecorationsHint(bool extendIntoClientAreaHint)
         {
-            SetTransientParent((X11Window)parent);
-            ShowCore();
         }
+
+        public void SetExtendClientAreaChromeHints(ExtendClientAreaChromeHints hints)
+        {
+        }
+
+        public void SetExtendClientAreaTitleBarHeightHint(double titleBarHeight)
+        {
+        }
+
+        public Action GotInputWhenDisabled { get; set; }
 
         public void SetIcon(IWindowIconImpl icon)
         {
-            var data = ((X11IconData)icon).Data;
-            fixed (void* pdata = data)
-                XChangeProperty(_x11.Display, _handle, _x11.Atoms._NET_WM_ICON,
-                    new IntPtr((int)Atom.XA_CARDINAL), 32, PropertyMode.Replace,
-                    pdata, data.Length);
+            if (icon != null)
+            {
+                var data = ((X11IconData)icon).Data;
+                fixed (void* pdata = data)
+                    XChangeProperty(_x11.Display, _handle, _x11.Atoms._NET_WM_ICON,
+                        new IntPtr((int)Atom.XA_CARDINAL), 32, PropertyMode.Replace,
+                        pdata, data.Length);
+            }
+            else
+            {
+                XDeleteProperty(_x11.Display, _handle, _x11.Atoms._NET_WM_ICON);
+            }
         }
 
         public void ShowTaskbarIcon(bool value)
         {
+            ChangeWMAtoms(!value, _x11.Atoms._NET_WM_STATE_SKIP_TASKBAR);
+        }
+
+        void ChangeWMAtoms(bool enable, params IntPtr[] atoms)
+        {
+            if (atoms.Length != 1 && atoms.Length != 2)
+                throw new ArgumentException();
+
+            if (!_mapped)
+            {
+                XGetWindowProperty(_x11.Display, _handle, _x11.Atoms._NET_WM_STATE, IntPtr.Zero, new IntPtr(256),
+                    false, (IntPtr)Atom.XA_ATOM, out _, out _, out var nitems, out _,
+                    out var prop);
+                var ptr = (IntPtr*)prop.ToPointer();
+                var newAtoms = new HashSet<IntPtr>();
+                for (var c = 0; c < nitems.ToInt64(); c++) 
+                    newAtoms.Add(*ptr);
+                XFree(prop);
+                foreach(var atom in atoms)
+                    if (enable)
+                        newAtoms.Add(atom);
+                    else
+                        newAtoms.Remove(atom);
+
+                XChangeProperty(_x11.Display, _handle, _x11.Atoms._NET_WM_STATE, (IntPtr)Atom.XA_ATOM, 32,
+                    PropertyMode.Replace, newAtoms.ToArray(), newAtoms.Count);
+            }
+            
             SendNetWMMessage(_x11.Atoms._NET_WM_STATE,
-                (IntPtr)(value ? 0 : 1), _x11.Atoms._NET_WM_STATE_SKIP_TASKBAR, IntPtr.Zero);
+                (IntPtr)(enable ? 1 : 0),
+                atoms[0],
+                atoms.Length > 1 ? atoms[1] : IntPtr.Zero,
+                atoms.Length > 2 ? atoms[2] : IntPtr.Zero,
+                atoms.Length > 3 ? atoms[3] : IntPtr.Zero
+            );
         }
 
         public IPopupPositioner PopupPositioner { get; }
+        public ITopLevelNativeMenuExporter NativeMenuExporter { get; }
+        public INativeControlHostImpl NativeControlHost { get; }
+        public ITextInputMethodImpl TextInputMethod => _ime;
+
+        public void SetTransparencyLevelHint(WindowTransparencyLevel transparencyLevel) =>
+            _transparencyHelper?.SetTransparencyRequest(transparencyLevel);
+
+        public void SetWindowManagerAddShadowHint(bool enabled)
+        {
+        }
+
+        public WindowTransparencyLevel TransparencyLevel =>
+            _transparencyHelper?.CurrentLevel ?? WindowTransparencyLevel.None;
+
+        public AcrylicPlatformCompensationLevels AcrylicCompensationLevels { get; } = new AcrylicPlatformCompensationLevels(1, 0.8, 0.8);
+
+        public bool NeedsManagedDecorations => false;
+
+
+        public class SurfacePlatformHandle : IPlatformNativeSurfaceHandle
+        {
+            private readonly X11Window _owner;
+
+            public PixelSize Size => _owner.ToPixelSize(_owner.ClientSize);
+
+            public double Scaling => _owner.RenderScaling;
+
+            public SurfacePlatformHandle(X11Window owner)
+            {
+                _owner = owner;
+            }
+
+            public IntPtr Handle => _owner._renderHandle;
+            public string? HandleDescriptor => "XID";
+        }
     }
 }

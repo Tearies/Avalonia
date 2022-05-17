@@ -1,15 +1,13 @@
-﻿<Project>
-  <Import Project="Sdk.props" Sdk="MSBuild.Sdk.Extras" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>xamarin.ios10</TargetFramework>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TargetFramework>net6.0-ios</TargetFramework>
+    <SupportedOSPlatformVersion>10.0</SupportedOSPlatformVersion>
+    <MSBuildEnableWorkloadResolver>true</MSBuildEnableWorkloadResolver>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\packages\Avalonia\Avalonia.csproj" />
-    <PackageReference Include="System.Reflection.Emit" Version="4.3.0" ExcludeAssets="All" />
+    <ProjectReference Include="..\..\Avalonia.Base\Avalonia.Base.csproj" />
+    <ProjectReference Include="..\..\Skia\Avalonia.Skia\Avalonia.Skia.csproj" />
   </ItemGroup>
-  <Import Project="..\..\Shared\PlatformSupport\PlatformSupport.projitems" Label="Shared" />
-  <Import Project="..\..\..\build\Rx.props" />
-  <Import Project="Sdk.targets" Sdk="MSBuild.Sdk.Extras" />
-  <Import Project="..\..\..\build\iOSWorkarounds.props" />
+  
+  <Import Project="..\..\..\build\DevAnalyzers.props" />
 </Project>

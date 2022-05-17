@@ -1,11 +1,9 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using Avalonia.Native.Interop;
+﻿using Avalonia.Native.Interop;
+using JetBrains.Annotations;
 
 namespace Avalonia.Native
 {
-    public static class Helpers
+    internal static class Helpers
     {
         public static Point ToAvaloniaPoint (this AvnPoint pt)
         {
@@ -27,11 +25,21 @@ namespace Avalonia.Native
             return new AvnPoint { X = pt.X, Y = pt.Y };
         }
 
+        public static AvnRect ToAvnRect (this Rect rect)
+        {
+            return new AvnRect() { X = rect.X, Y= rect.Y, Height = rect.Height, Width = rect.Width };
+        }
+
         public static AvnSize ToAvnSize (this Size size)
         {
             return new AvnSize { Height = size.Height, Width = size.Width };
         }
 
+        public static IAvnString ToAvnString(this string s)
+        {
+            return s != null ? new AvnString(s) : null;
+        }
+        
         public static Size ToAvaloniaSize (this AvnSize size)
         {
             return new Size(size.Width, size.Height);

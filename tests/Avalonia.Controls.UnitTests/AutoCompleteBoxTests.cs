@@ -1,7 +1,4 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -17,6 +14,8 @@ using Avalonia.UnitTests;
 using Moq;
 using Xunit;
 using System.Collections.ObjectModel;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 
 namespace Avalonia.Controls.UnitTests
 {
@@ -103,6 +102,16 @@ namespace Avalonia.Controls.UnitTests
                 Assert.True(control.SearchText == String.Empty);
                 Assert.False(control.IsDropDownOpen);
                 Assert.True(closeEvent);
+            });
+        }
+
+        [Fact]
+        public void Custom_FilterMode_Without_ItemFilter_Setting_Throws_Exception()
+        {
+            RunTest((control, textbox) =>
+            {
+                control.FilterMode = AutoCompleteFilterMode.Custom;
+                Assert.Throws<Exception>(() => { control.Text = "a"; });
             });
         }
 
@@ -366,6 +375,70 @@ namespace Avalonia.Controls.UnitTests
             });
         }
         
+        [Fact]
+        public void Custom_TextSelector()
+        {
+            RunTest((control, textbox) =>
+            {
+                object selectedItem = control.Items.Cast<object>().First();
+                string input = "42";
+
+                control.TextSelector = (text, item) => text + item;
+                Assert.Equal(control.TextSelector("4", "2"), "42");
+
+                control.Text = input;
+                control.SelectedItem = selectedItem;
+                Assert.Equal(control.Text, control.TextSelector(input, selectedItem.ToString()));
+            });
+        }
+        
+        [Fact]
+        public void Custom_ItemSelector()
+        {
+            RunTest((control, textbox) =>
+            {
+                object selectedItem = control.Items.Cast<object>().First();
+                string input = "42";
+
+                control.ItemSelector = (text, item) => text + item;
+                Assert.Equal(control.ItemSelector("4", 2), "42");
+
+                control.Text = input;
+                control.SelectedItem = selectedItem;
+                Assert.Equal(control.Text, control.ItemSelector(input, selectedItem));
+            });
+        }
+        
+        [Fact]
+        public void Text_Validation()
+        {
+            RunTest((control, textbox) =>
+            {
+                var exception = new InvalidCastException("failed validation");
+                var textObservable = new BehaviorSubject<BindingNotification>(new BindingNotification(exception, BindingErrorType.DataValidationError));
+                control.Bind(AutoCompleteBox.TextProperty, textObservable);
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Equal(DataValidationErrors.GetHasErrors(control), true);
+                Assert.Equal(DataValidationErrors.GetErrors(control).SequenceEqual(new[] { exception }), true);
+            });
+        }
+        
+        [Fact]
+        public void SelectedItem_Validation()
+        {
+            RunTest((control, textbox) =>
+            {
+                var exception = new InvalidCastException("failed validation");
+                var itemObservable = new BehaviorSubject<BindingNotification>(new BindingNotification(exception, BindingErrorType.DataValidationError));
+                control.Bind(AutoCompleteBox.SelectedItemProperty, itemObservable);
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Equal(DataValidationErrors.GetHasErrors(control), true);
+                Assert.Equal(DataValidationErrors.GetErrors(control).SequenceEqual(new[] { exception }), true);
+            });
+        }
+
         /// <summary>
         /// Retrieves a defined predicate filter through a new AutoCompleteBox 
         /// control instance.
@@ -984,6 +1057,7 @@ namespace Avalonia.Controls.UnitTests
                 TextBox textBox = GetTextBox(control);
                 var window = new Window {Content = control};
                 window.ApplyTemplate();
+                window.Presenter.ApplyTemplate();
                 Dispatcher.UIThread.RunJobs();
                 test.Invoke(control, textBox);
             }

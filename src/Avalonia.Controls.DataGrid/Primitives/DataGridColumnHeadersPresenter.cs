@@ -3,8 +3,10 @@
 // Please see http://go.microsoft.com/fwlink/?LinkID=131993 for details.
 // All other rights reserved.
 
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using System;
+using System.Collections.Specialized;
 using System.Diagnostics;
 
 namespace Avalonia.Controls.Primitives
@@ -13,10 +15,11 @@ namespace Avalonia.Controls.Primitives
     /// Used within the template of a <see cref="T:Avalonia.Controls.DataGrid" /> to specify the 
     /// location in the control's visual tree where the column headers are to be added.
     /// </summary>
-    public sealed class DataGridColumnHeadersPresenter : Panel
+    public sealed class DataGridColumnHeadersPresenter : Panel, IChildIndexProvider
     {
         private Control _dragIndicator;
         private IControl _dropLocationIndicator;
+        private EventHandler<ChildIndexChangedEventArgs> _childIndexChanged;
 
         /// <summary>
         /// Tracks which column is currently being dragged.
@@ -104,6 +107,25 @@ namespace Avalonia.Controls.Primitives
             set;
         }
 
+        event EventHandler<ChildIndexChangedEventArgs> IChildIndexProvider.ChildIndexChanged
+        {
+            add => _childIndexChanged += value;
+            remove => _childIndexChanged -= value;
+        }
+
+        int IChildIndexProvider.GetChildIndex(ILogical child)
+        {
+            return child is DataGridColumnHeader header
+                ? OwningGrid.ColumnsInternal.GetColumnDisplayIndex(header.ColumnIndex)
+                : throw new InvalidOperationException("Invalid cell type");
+        }
+
+        bool IChildIndexProvider.TryGetTotalCount(out int count)
+        {
+            count = OwningGrid.ColumnsInternal.VisibleColumnCount;
+            return true;
+        }
+
         /// <summary>
         /// Arranges the content of the <see cref="T:Avalonia.Controls.Primitives.DataGridColumnHeadersPresenter" />.
         /// </summary>
@@ -140,7 +162,7 @@ namespace Avalonia.Controls.Primitives
                 if (dataGridColumn.IsFrozen)
                 {
                     columnHeader.Arrange(new Rect(frozenLeftEdge, 0, dataGridColumn.LayoutRoundedWidth, finalSize.Height));
-                    columnHeader.Clip = null; // The layout system could have clipped this becaues it's not aware of our render transform
+                    columnHeader.Clip = null; // The layout system could have clipped this because it's not aware of our render transform
                     if (DragColumn == dataGridColumn && DragIndicator != null)
                     {
                         dragIndicatorLeftEdge = frozenLeftEdge + DragIndicatorOffset;
@@ -390,6 +412,18 @@ namespace Avalonia.Controls.Primitives
 
             OwningGrid.ColumnsInternal.EnsureVisibleEdgedColumnsWidth();
             return new Size(OwningGrid.ColumnsInternal.VisibleEdgedColumnsWidth, height);
+        }
+
+        protected override void ChildrenChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            base.ChildrenChanged(sender, e);
+
+            InvalidateChildIndex();
+        }
+
+        internal void InvalidateChildIndex()
+        {
+            _childIndexChanged?.Invoke(this, ChildIndexChangedEventArgs.Empty);
         }
     }
 }

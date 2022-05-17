@@ -1,7 +1,4 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Specialized;
 using System.Reactive.Linq;
@@ -9,6 +6,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Utils;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.VisualTree;
 
 namespace Avalonia.Controls.Presenters
 {
@@ -18,7 +16,7 @@ namespace Avalonia.Controls.Presenters
     internal abstract class ItemVirtualizer : IVirtualizingController, IDisposable
     {
         private double _crossAxisOffset;
-        private IDisposable _subscriptions;
+        private IDisposable? _subscriptions;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ItemVirtualizer"/> class.
@@ -48,12 +46,12 @@ namespace Avalonia.Controls.Presenters
         /// <summary>
         /// Gets the <see cref="IVirtualizingPanel"/> which will host the items.
         /// </summary>
-        public IVirtualizingPanel VirtualizingPanel => Owner.Panel as IVirtualizingPanel;
+        public IVirtualizingPanel? VirtualizingPanel => Owner.Panel as IVirtualizingPanel;
 
         /// <summary>
         /// Gets the items to display.
         /// </summary>
-        public IEnumerable Items { get; private set; }
+        public IEnumerable? Items { get; private set; }
 
         /// <summary>
         /// Gets the number of items in <see cref="Items"/>.
@@ -102,9 +100,14 @@ namespace Avalonia.Controls.Presenters
         {
             get
             {
-                return Vertical ?
-                    new Size(Owner.Panel.DesiredSize.Width, ExtentValue) :
-                    new Size(ExtentValue, Owner.Panel.DesiredSize.Height);
+                if (IsLogicalScrollEnabled && Owner.Panel is Panel panel)
+                {
+                    return Vertical ?
+                        new Size(panel.DesiredSize.Width, ExtentValue) :
+                        new Size(ExtentValue, panel.DesiredSize.Height);
+                }
+
+                return default;
             }
         }
 
@@ -115,9 +118,14 @@ namespace Avalonia.Controls.Presenters
         {
             get
             {
-                return Vertical ? 
-                    new Size(Owner.Panel.Bounds.Width, ViewportValue) :
-                    new Size(ViewportValue, Owner.Panel.Bounds.Height);
+                if (IsLogicalScrollEnabled && Owner.Panel is Panel panel)
+                {
+                    return Vertical ?
+                        new Size(panel.Bounds.Width, ViewportValue) :
+                        new Size(ViewportValue, panel.Bounds.Height);
+                }
+
+                return default;
             }
         }
 
@@ -128,11 +136,21 @@ namespace Avalonia.Controls.Presenters
         {
             get
             {
-                return Vertical ? new Vector(_crossAxisOffset, OffsetValue) : new Vector(OffsetValue, _crossAxisOffset);
+                if (IsLogicalScrollEnabled)
+                {
+                    return Vertical ? new Vector(_crossAxisOffset, OffsetValue) : new Vector(OffsetValue, _crossAxisOffset);
+                }
+
+                return default;
             }
 
             set
             {
+                if (!IsLogicalScrollEnabled)
+                {
+                    throw new NotSupportedException("Logical scrolling disabled.");
+                }
+
                 var oldCrossAxisOffset = _crossAxisOffset;
 
                 if (Vertical)
@@ -159,7 +177,7 @@ namespace Avalonia.Controls.Presenters
         /// </summary>
         /// <param name="owner">The items presenter.</param>
         /// <returns>An <see cref="ItemVirtualizer"/>.</returns>
-        public static ItemVirtualizer Create(ItemsPresenter owner)
+        public static ItemVirtualizer? Create(ItemsPresenter owner)
         {
             if (owner.Panel == null)
             {
@@ -167,10 +185,10 @@ namespace Avalonia.Controls.Presenters
             }
 
             var virtualizingPanel = owner.Panel as IVirtualizingPanel;
-            var scrollable = (ILogicalScrollable)owner;
-            ItemVirtualizer result = null;
+            var scrollContentPresenter = owner.Parent as IScrollable;
+            ItemVirtualizer? result = null;
 
-            if (virtualizingPanel != null && scrollable.InvalidateScroll != null)
+            if (virtualizingPanel != null && scrollContentPresenter is object)
             {
                 switch (owner.VirtualizationMode)
                 {
@@ -200,7 +218,7 @@ namespace Avalonia.Controls.Presenters
         /// <returns>The desired size for the control.</returns>
         public virtual Size MeasureOverride(Size availableSize)
         {
-            Owner.Panel.Measure(availableSize);
+            Owner.Panel!.Measure(availableSize);
             return Owner.Panel.DesiredSize;
         }
 
@@ -214,12 +232,12 @@ namespace Avalonia.Controls.Presenters
             if (VirtualizingPanel != null)
             {
                 VirtualizingPanel.CrossAxisOffset = _crossAxisOffset;
-                Owner.Panel.Arrange(new Rect(finalSize));
+                Owner.Panel!.Arrange(new Rect(finalSize));
             }
             else
             {
                 var origin = Vertical ? new Point(-_crossAxisOffset, 0) : new Point(0, _crossAxisOffset);
-                Owner.Panel.Arrange(new Rect(origin, finalSize));
+                Owner.Panel!.Arrange(new Rect(origin, finalSize));
             }
 
             return finalSize;
@@ -236,7 +254,7 @@ namespace Avalonia.Controls.Presenters
         /// <param name="direction">The movement direction.</param>
         /// <param name="from">The control from which movement begins.</param>
         /// <returns>The control.</returns>
-        public virtual IControl GetControlInDirection(NavigationDirection direction, IControl from)
+        public virtual IControl? GetControlInDirection(NavigationDirection direction, IControl? from)
         {
             return null;
         }
@@ -248,17 +266,17 @@ namespace Avalonia.Controls.Presenters
         /// </summary>
         /// <param name="items">The items.</param>
         /// <param name="e">A description of the change.</param>
-        public virtual void ItemsChanged(IEnumerable items, NotifyCollectionChangedEventArgs e)
+        public virtual void ItemsChanged(IEnumerable? items, NotifyCollectionChangedEventArgs e)
         {
             Items = items;
-            ItemCount = items.Count();
+            ItemCount = items?.Count() ?? 0;
         }
 
         /// <summary>
         /// Scrolls the specified item into view.
         /// </summary>
-        /// <param name="item">The item.</param>
-        public virtual void ScrollIntoView(object item)
+        /// <param name="index">The index of the item.</param>
+        public virtual void ScrollIntoView(int index)
         {
         }
 
@@ -280,6 +298,6 @@ namespace Avalonia.Controls.Presenters
         /// <summary>
         /// Invalidates the current scroll.
         /// </summary>
-        protected void InvalidateScroll() => ((ILogicalScrollable)Owner).InvalidateScroll?.Invoke();
+        protected void InvalidateScroll() => ((ILogicalScrollable)Owner).RaiseScrollInvalidated(EventArgs.Empty);
     }
 }

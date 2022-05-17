@@ -1,117 +1,198 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-
 using Avalonia.Media;
-
 using SkiaSharp;
 
 namespace Avalonia.Skia
 {
-    internal class SKTypefaceCollection
+    public class SKTypefaceCollection
     {
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<FontKey, SKTypeface>> _fontFamilies =
-            new ConcurrentDictionary<string, ConcurrentDictionary<FontKey, SKTypeface>>();
+        private readonly ConcurrentDictionary<Typeface, SKTypeface> _typefaces =
+            new ConcurrentDictionary<Typeface, SKTypeface>();
 
-        public void AddTypeFace(SKTypeface typeface)
+        public void AddTypeface(Typeface key, SKTypeface typeface)
         {
-            var key = new FontKey((SKFontStyleWeight)typeface.FontWeight, typeface.FontSlant);
-
-            if (!_fontFamilies.TryGetValue(typeface.FamilyName, out var fontFamily))
-            {
-                fontFamily = new ConcurrentDictionary<FontKey, SKTypeface>();
-
-                _fontFamilies.TryAdd(typeface.FamilyName, fontFamily);
-            }
-
-            fontFamily.TryAdd(key, typeface);
+            _typefaces.TryAdd(key, typeface);
         }
 
-        public SKTypeface GetTypeFace(Typeface typeface)
+        public SKTypeface Get(Typeface typeface)
         {
-            var styleSlant = SKFontStyleSlant.Upright;
-
-            switch (typeface.Style)
-            {
-                case FontStyle.Italic:
-                    styleSlant = SKFontStyleSlant.Italic;
-                    break;
-
-                case FontStyle.Oblique:
-                    styleSlant = SKFontStyleSlant.Oblique;
-                    break;
-            }
-
-            if (!_fontFamilies.TryGetValue(typeface.FontFamily.Name, out var fontFamily))
-            {
-                return TypefaceCache.GetTypeface(TypefaceCache.DefaultFamilyName, typeface.Style, typeface.Weight);
-            }
-
-            var weight = (SKFontStyleWeight)typeface.Weight;
-
-            var key = new FontKey(weight, styleSlant);
-
-            return fontFamily.GetOrAdd(key, GetFallback(fontFamily, key));
+            return GetNearestMatch(typeface);
         }
 
-        private static SKTypeface GetFallback(IDictionary<FontKey, SKTypeface> fontFamily, FontKey key)
+        private SKTypeface GetNearestMatch(Typeface key)
         {
-            var keys = fontFamily.Keys.Where(
-                x => ((int)x.Weight <= (int)key.Weight || (int)x.Weight > (int)key.Weight) && x.Slant == key.Slant).ToArray();
-
-            if (!keys.Any())
+            if (_typefaces.Count == 0)
             {
-                keys = fontFamily.Keys.Where(
-                    x => x.Weight == key.Weight && (x.Slant >= key.Slant || x.Slant < key.Slant)).ToArray();
+                return null;
+            }
+            
+            if (_typefaces.TryGetValue(key, out var typeface))
+            {
+                return typeface;
+            }
 
-                if (!keys.Any())
+            if(key.Style != FontStyle.Normal)
+            {
+                key = new Typeface(key.FontFamily, FontStyle.Normal, key.Weight, key.Stretch);
+            }
+
+            if(key.Stretch != FontStretch.Normal)
+            {
+                if(TryFindStretchFallback(key, out typeface))
                 {
-                    keys = fontFamily.Keys.Where(
-                        x => ((int)x.Weight <= (int)key.Weight || (int)x.Weight > (int)key.Weight) &&
-                             (x.Slant >= key.Slant || x.Slant < key.Slant)).ToArray();
+                    return typeface;
+                }
+                
+                if(key.Weight != FontWeight.Normal)
+                {
+                    if (TryFindStretchFallback(new Typeface(key.FontFamily, key.Style, FontWeight.Normal, key.Stretch), out typeface))
+                    {
+                        return typeface;
+                    }
+                }
+
+                key = new Typeface(key.FontFamily, key.Style, key.Weight, FontStretch.Normal);
+            }
+
+            if(TryFindWeightFallback(key, out typeface))
+            {
+                return typeface;
+            }
+
+            if (TryFindStretchFallback(key, out typeface))
+            {
+                return typeface;
+            }
+
+            //Nothing was found so we try some regular typeface.
+            if (_typefaces.TryGetValue(new Typeface(key.FontFamily), out typeface))
+            {
+                return typeface;
+            }
+
+            SKTypeface skTypeface = null;
+
+            foreach(var pair in _typefaces)
+            {
+                skTypeface = pair.Value;
+
+                if (skTypeface.FamilyName.Contains(key.FontFamily.Name))
+                {
+                    return skTypeface;
                 }
             }
 
-            key = keys.FirstOrDefault();
-
-            fontFamily.TryGetValue(key, out var typeface);
-
-            return typeface;
+            return skTypeface;
         }
 
-        private struct FontKey
+        private bool TryFindStretchFallback(Typeface key, out SKTypeface typeface)
         {
-            public readonly SKFontStyleSlant Slant;
-            public readonly SKFontStyleWeight Weight;
+            typeface = null;
+            var stretch = (int)key.Stretch;
 
-            public FontKey(SKFontStyleWeight weight, SKFontStyleSlant slant)
+            if (stretch < 5)
             {
-                Slant = slant;
-                Weight = weight;
+                for (var i = 0; stretch + i < 9; i++)
+                {
+                    if (_typefaces.TryGetValue(new Typeface(key.FontFamily, key.Style, key.Weight, (FontStretch)(stretch + i)), out typeface))
+                    {
+                        return true;
+                    }
+                }
+            }
+            else
+            {
+                for (var i = 0; stretch - i > 1; i++)
+                {
+                    if (_typefaces.TryGetValue(new Typeface(key.FontFamily, key.Style, key.Weight, (FontStretch)(stretch - i)), out typeface))
+                    {
+                        return true;
+                    }
+                }
             }
 
-            public override int GetHashCode()
-            {
-                var hash = 17;
-                hash = (hash * 31) + (int)Slant;
-                hash = (hash * 31) + (int)Weight;
+            return false;
+        }
 
-                return hash;
+        private bool TryFindWeightFallback(Typeface key, out SKTypeface typeface)
+        {
+            typeface = null;
+            var weight = (int)key.Weight;
+
+            //If the target weight given is between 400 and 500 inclusive          
+            if (weight >= 400 && weight <= 500)
+            {
+                //Look for available weights between the target and 500, in ascending order.
+                for (var i = 0; weight + i <= 500; i += 50)
+                {
+                    if (_typefaces.TryGetValue(new Typeface(key.FontFamily, key.Style, (FontWeight)(weight + i), key.Stretch), out typeface))
+                    {
+                        return true;
+                    }
+                }
+
+                //If no match is found, look for available weights less than the target, in descending order.
+                for (var i = 0; weight - i >= 100; i += 50)
+                {
+                    if (_typefaces.TryGetValue(new Typeface(key.FontFamily, key.Style, (FontWeight)(weight - i), key.Stretch), out typeface))
+                    {
+                        return true;
+                    }
+                }
+
+                //If no match is found, look for available weights greater than 500, in ascending order.
+                for (var i = 0; weight + i <= 900; i += 50)
+                {
+                    if (_typefaces.TryGetValue(new Typeface(key.FontFamily, key.Style, (FontWeight)(weight + i), key.Stretch), out typeface))
+                    {
+                        return true;
+                    }
+                }
             }
 
-            public override bool Equals(object other)
+            //If a weight less than 400 is given, look for available weights less than the target, in descending order.           
+            if (weight < 400)
             {
-                return other is FontKey key && this.Equals(key);
+                for (var i = 0; weight - i >= 100; i += 50)
+                {
+                    if (_typefaces.TryGetValue(new Typeface(key.FontFamily, key.Style, (FontWeight)(weight - i), key.Stretch), out typeface))
+                    {
+                        return true;
+                    }
+                }
+
+                //If no match is found, look for available weights less than the target, in descending order.
+                for (var i = 0; weight + i <= 900; i += 50)
+                {
+                    if (_typefaces.TryGetValue(new Typeface(key.FontFamily, key.Style, (FontWeight)(weight + i), key.Stretch), out typeface))
+                    {
+                        return true;
+                    }
+                }
             }
 
-            private bool Equals(FontKey other)
+            //If a weight greater than 500 is given, look for available weights greater than the target, in ascending order.
+            if (weight > 500)
             {
-                return Slant == other.Slant &&
-                       Weight == other.Weight;
+                for (var i = 0; weight + i <= 900; i += 50)
+                {
+                    if (_typefaces.TryGetValue(new Typeface(key.FontFamily, key.Style, (FontWeight)(weight + i), key.Stretch), out typeface))
+                    {
+                        return true;
+                    }
+                }
+
+                //If no match is found, look for available weights less than the target, in descending order.
+                for (var i = 0; weight - i >= 100; i += 50)
+                {
+                    if (_typefaces.TryGetValue(new Typeface(key.FontFamily, key.Style, (FontWeight)(weight - i), key.Stretch), out typeface))
+                    {
+                        return true;
+                    }
+                }
             }
+
+            return false;
         }
     }
 }

@@ -1,12 +1,13 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Text;
+
+using Avalonia.MicroCom;
+using Avalonia.Win32.Win32Com;
 
 // ReSharper disable InconsistentNaming
 #pragma warning disable 169, 649
@@ -18,7 +19,7 @@ namespace Avalonia.Win32.Interop
     [SuppressMessage("Microsoft.StyleCop.CSharp.NamingRules", "SA1310:FieldNamesMustNotContainUnderscore", Justification = "Using Win32 naming for consistency.")]
     [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements must be documented", Justification = "Look in Win32 docs.")]
     [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1602:Enumeration items must be documented", Justification = "Look in Win32 docs.")]
-    internal static class UnmanagedMethods
+    internal unsafe static class UnmanagedMethods
     {
         public const int CW_USEDEFAULT = unchecked((int)0x80000000);
 
@@ -241,6 +242,170 @@ namespace Avalonia.Win32.Interop
             MK_XBUTTON2 = 0x0040
         }
 
+        public enum VirtualKeyStates : int
+        {
+            VK_LBUTTON = 0x01,
+            VK_RBUTTON = 0x02,
+            VK_CANCEL = 0x03,
+            VK_MBUTTON = 0x04,
+            VK_XBUTTON1 = 0x05,
+            VK_XBUTTON2 = 0x06,
+            VK_BACK = 0x08,
+            VK_TAB = 0x09,
+            VK_CLEAR = 0x0C,
+            VK_RETURN = 0x0D,
+            VK_SHIFT = 0x10,
+            VK_CONTROL = 0x11,
+            VK_MENU = 0x12,
+            VK_PAUSE = 0x13,
+            VK_CAPITAL = 0x14,
+            VK_KANA = 0x15,
+            VK_HANGEUL = 0x15,
+            VK_HANGUL = 0x15,
+            VK_JUNJA = 0x17,
+            VK_FINAL = 0x18,
+            VK_HANJA = 0x19,
+            VK_KANJI = 0x19,
+            VK_ESCAPE = 0x1B,
+            VK_CONVERT = 0x1C,
+            VK_NONCONVERT = 0x1D,
+            VK_ACCEPT = 0x1E,
+            VK_MODECHANGE = 0x1F,
+            VK_SPACE = 0x20,
+            VK_PRIOR = 0x21,
+            VK_NEXT = 0x22,
+            VK_END = 0x23,
+            VK_HOME = 0x24,
+            VK_LEFT = 0x25,
+            VK_UP = 0x26,
+            VK_RIGHT = 0x27,
+            VK_DOWN = 0x28,
+            VK_SELECT = 0x29,
+            VK_PRINT = 0x2A,
+            VK_EXECUTE = 0x2B,
+            VK_SNAPSHOT = 0x2C,
+            VK_INSERT = 0x2D,
+            VK_DELETE = 0x2E,
+            VK_HELP = 0x2F,
+            VK_LWIN = 0x5B,
+            VK_RWIN = 0x5C,
+            VK_APPS = 0x5D,
+            VK_SLEEP = 0x5F,
+            VK_NUMPAD0 = 0x60,
+            VK_NUMPAD1 = 0x61,
+            VK_NUMPAD2 = 0x62,
+            VK_NUMPAD3 = 0x63,
+            VK_NUMPAD4 = 0x64,
+            VK_NUMPAD5 = 0x65,
+            VK_NUMPAD6 = 0x66,
+            VK_NUMPAD7 = 0x67,
+            VK_NUMPAD8 = 0x68,
+            VK_NUMPAD9 = 0x69,
+            VK_MULTIPLY = 0x6A,
+            VK_ADD = 0x6B,
+            VK_SEPARATOR = 0x6C,
+            VK_SUBTRACT = 0x6D,
+            VK_DECIMAL = 0x6E,
+            VK_DIVIDE = 0x6F,
+            VK_F1 = 0x70,
+            VK_F2 = 0x71,
+            VK_F3 = 0x72,
+            VK_F4 = 0x73,
+            VK_F5 = 0x74,
+            VK_F6 = 0x75,
+            VK_F7 = 0x76,
+            VK_F8 = 0x77,
+            VK_F9 = 0x78,
+            VK_F10 = 0x79,
+            VK_F11 = 0x7A,
+            VK_F12 = 0x7B,
+            VK_F13 = 0x7C,
+            VK_F14 = 0x7D,
+            VK_F15 = 0x7E,
+            VK_F16 = 0x7F,
+            VK_F17 = 0x80,
+            VK_F18 = 0x81,
+            VK_F19 = 0x82,
+            VK_F20 = 0x83,
+            VK_F21 = 0x84,
+            VK_F22 = 0x85,
+            VK_F23 = 0x86,
+            VK_F24 = 0x87,
+            VK_NUMLOCK = 0x90,
+            VK_SCROLL = 0x91,
+            VK_OEM_NEC_EQUAL = 0x92,
+            VK_OEM_FJ_JISHO = 0x92,
+            VK_OEM_FJ_MASSHOU = 0x93,
+            VK_OEM_FJ_TOUROKU = 0x94,
+            VK_OEM_FJ_LOYA = 0x95,
+            VK_OEM_FJ_ROYA = 0x96,
+            VK_LSHIFT = 0xA0,
+            VK_RSHIFT = 0xA1,
+            VK_LCONTROL = 0xA2,
+            VK_RCONTROL = 0xA3,
+            VK_LMENU = 0xA4,
+            VK_RMENU = 0xA5,
+            VK_BROWSER_BACK = 0xA6,
+            VK_BROWSER_FORWARD = 0xA7,
+            VK_BROWSER_REFRESH = 0xA8,
+            VK_BROWSER_STOP = 0xA9,
+            VK_BROWSER_SEARCH = 0xAA,
+            VK_BROWSER_FAVORITES = 0xAB,
+            VK_BROWSER_HOME = 0xAC,
+            VK_VOLUME_MUTE = 0xAD,
+            VK_VOLUME_DOWN = 0xAE,
+            VK_VOLUME_UP = 0xAF,
+            VK_MEDIA_NEXT_TRACK = 0xB0,
+            VK_MEDIA_PREV_TRACK = 0xB1,
+            VK_MEDIA_STOP = 0xB2,
+            VK_MEDIA_PLAY_PAUSE = 0xB3,
+            VK_LAUNCH_MAIL = 0xB4,
+            VK_LAUNCH_MEDIA_SELECT = 0xB5,
+            VK_LAUNCH_APP1 = 0xB6,
+            VK_LAUNCH_APP2 = 0xB7,
+            VK_OEM_1 = 0xBA,
+            VK_OEM_PLUS = 0xBB,
+            VK_OEM_COMMA = 0xBC,
+            VK_OEM_MINUS = 0xBD,
+            VK_OEM_PERIOD = 0xBE,
+            VK_OEM_2 = 0xBF,
+            VK_OEM_3 = 0xC0,
+            VK_OEM_4 = 0xDB,
+            VK_OEM_5 = 0xDC,
+            VK_OEM_6 = 0xDD,
+            VK_OEM_7 = 0xDE,
+            VK_OEM_8 = 0xDF,
+            VK_OEM_AX = 0xE1,
+            VK_OEM_102 = 0xE2,
+            VK_ICO_HELP = 0xE3,
+            VK_ICO_00 = 0xE4,
+            VK_PROCESSKEY = 0xE5,
+            VK_ICO_CLEAR = 0xE6,
+            VK_PACKET = 0xE7,
+            VK_OEM_RESET = 0xE9,
+            VK_OEM_JUMP = 0xEA,
+            VK_OEM_PA1 = 0xEB,
+            VK_OEM_PA2 = 0xEC,
+            VK_OEM_PA3 = 0xED,
+            VK_OEM_WSCTRL = 0xEE,
+            VK_OEM_CUSEL = 0xEF,
+            VK_OEM_ATTN = 0xF0,
+            VK_OEM_FINISH = 0xF1,
+            VK_OEM_COPY = 0xF2,
+            VK_OEM_AUTO = 0xF3,
+            VK_OEM_ENLW = 0xF4,
+            VK_OEM_BACKTAB = 0xF5,
+            VK_ATTN = 0xF6,
+            VK_CRSEL = 0xF7,
+            VK_EXSEL = 0xF8,
+            VK_EREOF = 0xF9,
+            VK_PLAY = 0xFA,
+            VK_ZOOM = 0xFB,
+            VK_NONAME = 0xFC,
+            VK_PA1 = 0xFD,
+            VK_OEM_CLEAR = 0xFE
+        }
+
         public enum WindowActivate
         {
             WA_INACTIVE,
@@ -299,10 +464,12 @@ namespace Avalonia.Win32.Interop
             WS_SIZEFRAME = 0x40000,
             WS_SYSMENU = 0x80000,
             WS_TABSTOP = 0x10000,
+            WS_THICKFRAME = 0x40000,
             WS_VISIBLE = 0x10000000,
             WS_VSCROLL = 0x200000,
             WS_EX_DLGMODALFRAME = 0x00000001,
             WS_EX_NOPARENTNOTIFY = 0x00000004,
+            WS_EX_NOREDIRECTIONBITMAP = 0x00200000,
             WS_EX_TOPMOST = 0x00000008,
             WS_EX_ACCEPTFILES = 0x00000010,
             WS_EX_TRANSPARENT = 0x00000020,
@@ -581,6 +748,42 @@ namespace Avalonia.Win32.Interop
             WM_DISPATCH_WORK_ITEM = WM_USER,
         }
 
+        public enum DwmWindowAttribute : uint
+        {
+            DWMWA_NCRENDERING_ENABLED = 1,
+            DWMWA_NCRENDERING_POLICY,
+            DWMWA_TRANSITIONS_FORCEDISABLED,
+            DWMWA_ALLOW_NCPAINT,
+            DWMWA_CAPTION_BUTTON_BOUNDS,
+            DWMWA_NONCLIENT_RTL_LAYOUT,
+            DWMWA_FORCE_ICONIC_REPRESENTATION,
+            DWMWA_FLIP3D_POLICY,
+            DWMWA_EXTENDED_FRAME_BOUNDS,
+            DWMWA_HAS_ICONIC_BITMAP,
+            DWMWA_DISALLOW_PEEK,
+            DWMWA_EXCLUDED_FROM_PEEK,
+            DWMWA_CLOAK,
+            DWMWA_CLOAKED,
+            DWMWA_FREEZE_REPRESENTATION,
+            DWMWA_PASSIVE_UPDATE_MODE,
+            DWMWA_USE_HOSTBACKDROPBRUSH,
+            DWMWA_USE_IMMERSIVE_DARK_MODE = 20,
+            DWMWA_WINDOW_CORNER_PREFERENCE = 33,
+            DWMWA_BORDER_COLOR,
+            DWMWA_CAPTION_COLOR,
+            DWMWA_TEXT_COLOR,
+            DWMWA_VISIBLE_FRAME_BORDER_THICKNESS,
+            DWMWA_LAST
+        };
+
+        public enum MapVirtualKeyMapTypes : uint
+        {
+            MAPVK_VK_TO_VSC = 0x00,
+            MAPVK_VSC_TO_VK = 0x01,
+            MAPVK_VK_TO_CHAR = 0x02,
+            MAPVK_VSC_TO_VK_EX = 0x03,
+        }
+
         public enum BitmapCompressionMode : uint
         {
             BI_RGB = 0,
@@ -616,6 +819,31 @@ namespace Avalonia.Win32.Interop
             MNC_SELECT = 3
         }
 
+        public enum SysCommands
+        {
+            SC_SIZE = 0xF000,
+            SC_MOVE = 0xF010,
+            SC_MINIMIZE = 0xF020,
+            SC_MAXIMIZE = 0xF030,
+            SC_NEXTWINDOW = 0xF040,
+            SC_PREVWINDOW = 0xF050,
+            SC_CLOSE = 0xF060,
+            SC_VSCROLL = 0xF070,
+            SC_HSCROLL = 0xF080,
+            SC_MOUSEMENU = 0xF090,
+            SC_KEYMENU = 0xF100,
+            SC_ARRANGE = 0xF110,
+            SC_RESTORE = 0xF120,
+            SC_TASKLIST = 0xF130,
+            SC_SCREENSAVE = 0xF140,
+            SC_HOTKEY = 0xF150,
+            SC_DEFAULT = 0xF160,
+            SC_MONITORPOWER = 0xF170,
+            SC_CONTEXTHELP = 0xF180,
+            SC_SEPARATOR = 0xF00F,
+            SCF_ISSECURE = 0x00000001,
+        }
+
         [StructLayout(LayoutKind.Sequential)]
         public struct RGBQUAD
         {
@@ -642,7 +870,7 @@ namespace Avalonia.Win32.Interop
 
             public void Init()
             {
-                biSize = (uint)Marshal.SizeOf(this);
+                biSize = (uint)sizeof(BITMAPINFOHEADER);
             }
         }
 
@@ -686,9 +914,9 @@ namespace Avalonia.Win32.Interop
         [DllImport("user32.dll")]
         public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip,
                                                       MonitorEnumDelegate lpfnEnum, IntPtr dwData);
-        
+
         public delegate bool MonitorEnumDelegate(IntPtr hMonitor, IntPtr hdcMonitor, ref Rect lprcMonitor, IntPtr dwData);
-        
+
         [DllImport("user32.dll", SetLastError = true)]
         public static extern IntPtr GetDC(IntPtr hWnd);
 
@@ -756,8 +984,11 @@ namespace Avalonia.Win32.Interop
         [DllImport("user32.dll")]
         public static extern bool GetKeyboardState(byte[] lpKeyState);
 
-        [DllImport("user32.dll", EntryPoint = "GetMessageW")]
-        public static extern sbyte GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+        [DllImport("user32.dll", EntryPoint = "MapVirtualKeyW")]
+        public static extern uint MapVirtualKey(uint uCode, uint uMapType);
+
+        [DllImport("user32.dll", EntryPoint = "GetMessageW", SetLastError = true)]
+        public static extern int GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
 
         [DllImport("user32.dll")]
         public static extern int GetMessageTime();
@@ -776,7 +1007,7 @@ namespace Avalonia.Win32.Interop
 
         public static uint GetWindowLong(IntPtr hWnd, int nIndex)
         {
-            if(IntPtr.Size == 4)
+            if (IntPtr.Size == 4)
             {
                 return GetWindowLong32b(hWnd, nIndex);
             }
@@ -803,7 +1034,7 @@ namespace Avalonia.Win32.Interop
                 return (uint)SetWindowLong64b(hWnd, nIndex, new IntPtr((uint)value)).ToInt32();
             }
         }
-        
+
         public static IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr handle)
         {
             if (IntPtr.Size == 4)
@@ -816,6 +1047,12 @@ namespace Avalonia.Win32.Interop
             }
         }
 
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetSystemMenu(IntPtr hWnd, bool bRevert);
+
+        [DllImport("user32.dll")]
+        public static extern bool EnableMenuItem(IntPtr hMenu, uint uIDEnableItem, uint uEnable);
+
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
 
@@ -827,6 +1064,17 @@ namespace Avalonia.Win32.Interop
 
         [DllImport("user32.dll")]
         public static extern bool InvalidateRect(IntPtr hWnd, ref RECT lpRect, bool bErase);
+
+
+        [DllImport("user32.dll")]
+        public static extern bool InvalidateRect(IntPtr hWnd, RECT* lpRect, bool bErase);
+
+
+        [DllImport("user32.dll")]
+        public static extern bool ValidateRect(IntPtr hWnd, IntPtr lpRect);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         public static extern bool IsWindowEnabled(IntPtr hWnd);
@@ -844,25 +1092,40 @@ namespace Avalonia.Win32.Interop
         public static extern IntPtr LoadCursor(IntPtr hInstance, IntPtr lpCursorName);
 
         [DllImport("user32.dll")]
+        public static extern IntPtr CreateIconIndirect([In] ref ICONINFO iconInfo);
+
+        [DllImport("user32.dll")]
+        public static extern bool DestroyIcon(IntPtr hIcon);
+
+        [DllImport("user32.dll")]
         public static extern bool PeekMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax, uint wRemoveMsg);
 
         [DllImport("user32")]
         public static extern IntPtr GetMessageExtraInfo();
-        
+
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "RegisterClassExW")]
         public static extern ushort RegisterClassEx(ref WNDCLASSEX lpwcx);
 
         [DllImport("user32.dll")]
         public static extern void RegisterTouchWindow(IntPtr hWnd, int flags);
-        
+
         [DllImport("user32.dll")]
         public static extern bool ReleaseCapture();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern uint RegisterWindowMessage(string lpString);
 
         [DllImport("user32.dll")]
         public static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
 
         [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr GetActiveWindow();
+
+        [DllImport("user32.dll", SetLastError = true)]
         public static extern IntPtr SetActiveWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         public static extern IntPtr SetCapture(IntPtr hWnd);
@@ -876,7 +1139,21 @@ namespace Avalonia.Win32.Interop
         [DllImport("user32.dll")]
         public static extern bool SetFocus(IntPtr hWnd);
         [DllImport("user32.dll")]
+        public static extern IntPtr GetFocus();
+        [DllImport("user32.dll")]
         public static extern bool SetParent(IntPtr hWnd, IntPtr hWndNewParent);
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetParent(IntPtr hWnd);
+
+        public enum GetAncestorFlags
+        {
+            GA_PARENT = 1,
+            GA_ROOT = 2,
+            GA_ROOTOWNER = 3
+        }
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetAncestor(IntPtr hwnd, GetAncestorFlags gaFlags);
         [DllImport("user32.dll")]
         public static extern bool ShowWindow(IntPtr hWnd, ShowWindowCommand nCmdShow);
 
@@ -937,6 +1214,9 @@ namespace Avalonia.Win32.Interop
             GCW_ATOM = -32
         }
 
+        [DllImport("shell32", CharSet = CharSet.Auto)]
+        public static extern int Shell_NotifyIcon(NIM dwMessage, NOTIFYICONDATA lpData);
+
         [DllImport("user32.dll", EntryPoint = "SetClassLongPtr")]
         private static extern IntPtr SetClassLong64(IntPtr hWnd, ClassLongIndex nIndex, IntPtr dwNewLong);
 
@@ -974,9 +1254,23 @@ namespace Avalonia.Win32.Interop
         internal static extern int CoCreateInstance(ref Guid clsid,
             IntPtr ignore1, int ignore2, ref Guid iid, [MarshalAs(UnmanagedType.IUnknown), Out] out object pUnkOuter);
 
-        
+        [DllImport("ole32.dll", PreserveSig = true)]
+        internal static extern int CoCreateInstance(ref Guid clsid,
+            IntPtr ignore1, int ignore2, ref Guid iid, [Out] out IntPtr pUnkOuter);
+
+        internal unsafe static T CreateInstance<T>(ref Guid clsid, ref Guid iid) where T : IUnknown
+        {
+            var hresult = CoCreateInstance(ref clsid, IntPtr.Zero, 1, ref iid, out IntPtr pUnk);
+            if (hresult != 0)
+            {
+                throw new COMException("CreateInstance", hresult);
+            }
+            using var unk = MicroComRuntime.CreateProxyFor<IUnknown>(pUnk, true);
+            return MicroComRuntime.QueryInterface<T>(unk);
+        }
+
         [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        internal static extern int SHCreateItemFromParsingName([MarshalAs(UnmanagedType.LPWStr)] string pszPath, IntPtr pbc, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out IShellItem ppv);
+        internal static extern int SHCreateItemFromParsingName([MarshalAs(UnmanagedType.LPWStr)] string pszPath, IntPtr pbc, ref Guid riid, out IntPtr ppv);
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool OpenClipboard(IntPtr hWndOwner);
@@ -993,6 +1287,12 @@ namespace Avalonia.Win32.Interop
         [DllImport("user32.dll")]
         public static extern IntPtr SetClipboardData(ClipboardFormat uFormat, IntPtr hMem);
 
+        [DllImport("ole32.dll", PreserveSig = false)]
+        public static extern int OleGetClipboard(out IntPtr dataObject);
+
+        [DllImport("ole32.dll", PreserveSig = true)]
+        public static extern int OleSetClipboard(IntPtr dataObject);
+
         [DllImport("kernel32.dll", ExactSpelling = true)]
         public static extern IntPtr GlobalLock(IntPtr handle);
 
@@ -1007,6 +1307,9 @@ namespace Avalonia.Win32.Interop
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern IntPtr LoadLibrary(string fileName);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern IntPtr LoadLibraryEx(string fileName, IntPtr hFile, int flags);
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
         public static extern IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
@@ -1031,6 +1334,9 @@ namespace Avalonia.Win32.Interop
         [DllImport("shcore.dll")]
         public static extern long GetDpiForMonitor(IntPtr hmonitor, MONITOR_DPI_TYPE dpiType, out uint dpiX, out uint dpiY);
 
+        [DllImport("gdi32.dll")]
+        public static extern int GetDeviceCaps(IntPtr hdc, DEVICECAP nIndex);
+
         [DllImport("shcore.dll")]
         public static extern void GetScaleFactorForMonitor(IntPtr hMon, out uint pScale);
 
@@ -1045,22 +1351,22 @@ namespace Avalonia.Win32.Interop
 
         [DllImport("user32.dll")]
         public static extern IntPtr MonitorFromWindow(IntPtr hwnd, MONITOR dwFlags);
-        
+
         [DllImport("user32", EntryPoint = "GetMonitorInfoW", ExactSpelling = true, CharSet = CharSet.Unicode)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetMonitorInfo([In] IntPtr hMonitor, ref MONITORINFO lpmi);
 
         [DllImport("user32")]
-        public static extern bool GetTouchInputInfo(
+        public static extern unsafe bool GetTouchInputInfo(
             IntPtr hTouchInput,
-            uint        cInputs,
-            [Out]TOUCHINPUT[] pInputs,
-            int         cbSize
+            uint cInputs,
+            TOUCHINPUT* pInputs,
+            int cbSize
         );
-        
+
         [DllImport("user32")]
         public static extern bool CloseTouchInputHandle(IntPtr hTouchInput);
-        
+
         [return: MarshalAs(UnmanagedType.Bool)]
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "PostMessageW")]
         public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
@@ -1069,7 +1375,7 @@ namespace Avalonia.Win32.Interop
         public static extern int SetDIBitsToDevice(IntPtr hdc, int XDest, int YDest, uint
                 dwWidth, uint dwHeight, int XSrc, int YSrc, uint uStartScan, uint cScanLines,
             IntPtr lpvBits, [In] ref BITMAPINFOHEADER lpbmi, uint fuColorUse);
-        
+
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool CloseHandle(IntPtr hObject);
@@ -1082,6 +1388,41 @@ namespace Avalonia.Win32.Interop
         [DllImport("gdi32.dll")]
         public static extern IntPtr SelectObject(IntPtr hdc, IntPtr hObject);
 
+        [DllImport("gdi32.dll")]
+        public static extern int ChoosePixelFormat(IntPtr hdc, ref PixelFormatDescriptor pfd);
+
+        [DllImport("gdi32.dll")]
+        public static extern int DescribePixelFormat(IntPtr hdc, ref PixelFormatDescriptor pfd);
+
+        [DllImport("gdi32.dll")]
+        public static extern int SetPixelFormat(IntPtr hdc, int iPixelFormat, ref PixelFormatDescriptor pfd);
+
+
+        [DllImport("gdi32.dll")]
+        public static extern int DescribePixelFormat(IntPtr hdc, int iPixelFormat, int bytes, ref PixelFormatDescriptor pfd);
+
+        [DllImport("gdi32.dll")]
+        public static extern bool SwapBuffers(IntPtr hdc);
+
+        [DllImport("opengl32.dll")]
+        public static extern IntPtr wglCreateContext(IntPtr hdc);
+
+        [DllImport("opengl32.dll")]
+        public static extern bool wglDeleteContext(IntPtr context);
+
+
+        [DllImport("opengl32.dll")]
+        public static extern bool wglMakeCurrent(IntPtr hdc, IntPtr context);
+
+        [DllImport("opengl32.dll")]
+        public static extern IntPtr wglGetCurrentContext();
+
+        [DllImport("opengl32.dll")]
+        public static extern IntPtr wglGetCurrentDC();
+
+        [DllImport("opengl32.dll", CharSet = CharSet.Ansi)]
+        public static extern IntPtr wglGetProcAddress(string name);
+
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern IntPtr CreateFileMapping(IntPtr hFile,
             IntPtr lpFileMappingAttributes,
@@ -1090,12 +1431,15 @@ namespace Avalonia.Win32.Interop
             uint dwMaximumSizeLow,
             string lpName);
 
-        [DllImport("msvcrt.dll", EntryPoint="memcpy", SetLastError = false, CallingConvention=CallingConvention.Cdecl)]
-        public static extern IntPtr CopyMemory(IntPtr dest, IntPtr src, UIntPtr count); 
-        
+        [DllImport("msvcrt.dll", EntryPoint = "memcpy", SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr CopyMemory(IntPtr dest, IntPtr src, UIntPtr count);
+
         [DllImport("ole32.dll", CharSet = CharSet.Auto, ExactSpelling = true)]
-        public static extern HRESULT RegisterDragDrop(IntPtr hwnd, IDropTarget target);
-        
+        public static extern HRESULT RegisterDragDrop(IntPtr hwnd, IntPtr target);
+
+        [DllImport("ole32.dll", CharSet = CharSet.Auto, ExactSpelling = true)]
+        public static extern HRESULT RevokeDragDrop(IntPtr hwnd);
+
         [DllImport("ole32.dll", EntryPoint = "OleInitialize")]
         public static extern HRESULT OleInitialize(IntPtr val);
 
@@ -1115,9 +1459,269 @@ namespace Avalonia.Win32.Interop
         public static extern int DragQueryFile(IntPtr hDrop, int iFile, StringBuilder lpszFile, int cch);
 
         [DllImport("ole32.dll", CharSet = CharSet.Auto, ExactSpelling = true, PreserveSig = false)]
-        internal static extern void DoDragDrop(IOleDataObject dataObject, IDropSource dropSource, int allowedEffects, int[] finalEffect);
+        internal static extern void DoDragDrop(IntPtr dataObject, IntPtr dropSource, int allowedEffects, [Out] out int finalEffect);
 
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref MARGINS margins);
 
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, void* pvAttribute, int cbAttribute);
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmIsCompositionEnabled(out bool enabled);
+
+        [DllImport("dwmapi.dll")]
+        public static extern void DwmFlush();
+
+        [DllImport("dwmapi.dll")]
+        public static extern bool DwmDefWindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, ref IntPtr plResult);
+
+        [DllImport("dwmapi.dll")]
+        public static extern void DwmEnableBlurBehindWindow(IntPtr hwnd, ref DWM_BLURBEHIND blurBehind);
+        
+        [Flags]
+        public enum LayeredWindowFlags
+        {
+            LWA_ALPHA = 0x00000002,
+            LWA_COLORKEY = 0x00000001,
+        }
+        
+        [DllImport("user32.dll")]
+        public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, LayeredWindowFlags dwFlags);
+
+        [Flags]
+        public enum DWM_BB
+        {
+            Enable = 1,
+            BlurRegion = 2,
+            TransitionMaximized = 4
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct DWM_BLURBEHIND
+        {
+            public DWM_BB dwFlags;
+            public bool fEnable;
+            public IntPtr hRgnBlur;
+            public bool fTransitionOnMaximized;
+
+            public DWM_BLURBEHIND(bool enabled)
+            {
+                fEnable = enabled ? true : false;
+                hRgnBlur = IntPtr.Zero;
+                fTransitionOnMaximized = false;
+                dwFlags = DWM_BB.Enable;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct RTL_OSVERSIONINFOEX
+        {
+            internal uint dwOSVersionInfoSize;
+            internal uint dwMajorVersion;
+            internal uint dwMinorVersion;
+            internal uint dwBuildNumber;
+            internal uint dwPlatformId;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+            internal string szCSDVersion;
+        }
+
+        [DllImport("ntdll")]
+        private static extern int RtlGetVersion(ref RTL_OSVERSIONINFOEX lpVersionInformation);
+
+        internal static Version RtlGetVersion()
+        {
+            RTL_OSVERSIONINFOEX v = new RTL_OSVERSIONINFOEX();
+            v.dwOSVersionInfoSize = (uint)Marshal.SizeOf<RTL_OSVERSIONINFOEX>();
+            if (RtlGetVersion(ref v) == 0)
+            {
+                return new Version((int)v.dwMajorVersion, (int)v.dwMinorVersion, (int)v.dwBuildNumber);
+            }
+            else
+            {
+                throw new Exception("RtlGetVersion failed!");
+            }
+        }
+
+        [DllImport("kernel32", EntryPoint = "WaitForMultipleObjectsEx", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern int IntWaitForMultipleObjectsEx(int nCount, IntPtr[] pHandles, bool bWaitAll, int dwMilliseconds, bool bAlertable);
+
+        public const int WAIT_FAILED = unchecked((int)0xFFFFFFFF);
+
+        internal static int WaitForMultipleObjectsEx(int nCount, IntPtr[] pHandles, bool bWaitAll, int dwMilliseconds, bool bAlertable)
+        {
+            int result = IntWaitForMultipleObjectsEx(nCount, pHandles, bWaitAll, dwMilliseconds, bAlertable);
+            if (result == WAIT_FAILED)
+            {
+                throw new Win32Exception();
+            }
+
+            return result;
+        }
+
+        [DllImport("user32.dll")]
+        internal static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
+
+        [DllImport("imm32.dll", SetLastError = true)]
+        public static extern IntPtr ImmGetContext(IntPtr hWnd);
+        [DllImport("imm32.dll", SetLastError = true)]
+        public static extern IntPtr ImmAssociateContext(IntPtr hWnd, IntPtr hIMC);
+        [DllImport("imm32.dll", SetLastError = true)]
+        public static extern IntPtr ImmCreateContext();
+        [DllImport("imm32.dll")]
+        public static extern bool ImmReleaseContext(IntPtr hWnd, IntPtr hIMC);
+        [DllImport("imm32.dll")]
+        public static extern bool ImmSetOpenStatus(IntPtr hIMC, bool flag);
+        [DllImport("imm32.dll")]
+        public static extern bool ImmSetActiveContext(IntPtr hIMC, bool flag);
+        [DllImport("imm32.dll")]
+        public static extern bool ImmSetStatusWindowPos(IntPtr hIMC, ref POINT lpptPos);
+        [DllImport("imm32.dll")]
+        public static extern bool ImmIsIME(IntPtr HKL);
+        [DllImport("imm32.dll")]
+        public static extern bool ImmSetCandidateWindow(IntPtr hIMC, ref CANDIDATEFORM lpCandidate);
+        [DllImport("imm32.dll")]
+        public static extern bool ImmSetCompositionWindow(IntPtr hIMC, ref COMPOSITIONFORM lpComp);
+        [DllImport("imm32.dll")]
+        public static extern bool ImmSetCompositionFont(IntPtr hIMC, ref LOGFONT lf);
+        [DllImport("imm32.dll")]
+        public static extern bool ImmNotifyIME(IntPtr hIMC, int dwAction, int dwIndex, int dwValue);
+        [DllImport("user32.dll")]
+        public static extern bool CreateCaret(IntPtr hwnd, IntPtr hBitmap, int nWidth, int nHeight);
+        [DllImport("user32.dll")]
+        public static extern bool SetCaretPos(int X, int Y);
+        [DllImport("user32.dll")]
+        public static extern bool DestroyCaret();
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetKeyboardLayout(int idThread);
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern int LCIDToLocaleName(uint Locale, StringBuilder lpName, int cchName, int dwFlags);
+
+        public static uint MAKELCID(uint lgid, uint srtid)
+        {
+            return (((uint)(ushort)srtid) << 16) |
+                   ((ushort)lgid);
+        }
+
+        public static ushort PRIMARYLANGID(uint lgid)
+        {
+            return (ushort)(lgid & 0x3ff);
+        }
+
+        public static uint LGID(IntPtr HKL)
+        {
+            return (uint)(HKL.ToInt32() & 0xffff);
+        }
+
+        public const int SORT_DEFAULT = 0;
+        public const int LANG_ZH = 0x0004;
+        public const int LANG_JA = 0x0011;
+        public const int LANG_KO = 0x0012;
+
+        public const int CFS_FORCE_POSITION = 0x0020;
+        public const int CFS_CANDIDATEPOS = 0x0040;
+        public const int CFS_EXCLUDE = 0x0080;
+        public const int CFS_POINT = 0x0002;
+        public const int CFS_RECT = 0x0001;
+        public const uint ISC_SHOWUICOMPOSITIONWINDOW = 0x80000000;
+
+        public const int NI_COMPOSITIONSTR = 21;
+        public const int CPS_COMPLETE = 1;
+        public const int CPS_CONVERT = 2;
+        public const int CPS_REVERT = 3;
+        public const int CPS_CANCEL = 4;
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct CANDIDATEFORM
+        {
+            public int dwIndex;
+            public int dwStyle;
+            public POINT ptCurrentPos;
+            public RECT rcArea;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct COMPOSITIONFORM
+        {
+            public int dwStyle;
+            public POINT ptCurrentPos;
+            public RECT rcArea;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct LOGFONT
+        {
+            public int lfHeight;
+            public int lfWidth;
+            public int lfEscapement;
+            public int lfOrientation;
+            public int lfWeight;
+            public byte lfItalic;
+            public byte lfUnderline;
+            public byte lfStrikeOut;
+            public byte lfCharSet;
+            public byte lfOutPrecision;
+            public byte lfClipPrecision;
+            public byte lfQuality;
+            public byte lfPitchAndFamily;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+            public string lfFaceName;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct WindowCompositionAttributeData
+        {
+            public WindowCompositionAttribute Attribute;
+            public IntPtr Data;
+            public int SizeOfData;
+        }
+
+        internal enum WindowCompositionAttribute
+        {
+            // ...
+            WCA_ACCENT_POLICY = 19
+            // ...
+        }
+
+        internal enum AccentState
+        {
+            ACCENT_DISABLED = 0,
+            ACCENT_ENABLE_GRADIENT = 1,
+            ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,
+            ACCENT_ENABLE_BLURBEHIND = 3,
+            ACCENT_ENABLE_ACRYLIC = 4, //1703 and above
+            ACCENT_ENABLE_HOSTBACKDROP = 5,        // RS5 1809
+            ACCENT_INVALID_STATE = 6
+        }
+
+        internal enum AccentFlags
+        {
+            DrawLeftBorder = 0x20,
+            DrawTopBorder = 0x40,
+            DrawRightBorder = 0x80,
+            DrawBottomBorder = 0x100,
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct AccentPolicy
+        {
+            public AccentState AccentState;
+            public int AccentFlags;
+            public int GradientColor;
+            public int AnimationId;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct MARGINS
+        {
+            public int cxLeftWidth;
+            public int cxRightWidth;
+            public int cyTopHeight;
+            public int cyBottomHeight;
+        }
 
         public enum MONITOR
         {
@@ -1147,6 +1751,12 @@ namespace Avalonia.Win32.Interop
             }
         }
 
+        public enum DEVICECAP
+        {
+            HORZRES = 8,
+            DESKTOPHORZRES = 118
+        }
+
         public enum PROCESS_DPI_AWARENESS
         {
             PROCESS_DPI_UNAWARE = 0,
@@ -1160,9 +1770,9 @@ namespace Avalonia.Win32.Interop
             MDT_ANGULAR_DPI = 1,
             MDT_RAW_DPI = 2,
             MDT_DEFAULT = MDT_EFFECTIVE_DPI
-        } 
+        }
 
-        public enum ClipboardFormat 
+        public enum ClipboardFormat
         {
             /// <summary>
             /// Text format. Each line ends with a carriage return/linefeed (CR-LF) combination. A null character signals the end of the data. Use this format for ANSI text.
@@ -1209,6 +1819,12 @@ namespace Avalonia.Win32.Interop
         }
 
         public struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        public struct SIZE
         {
             public int X;
             public int Y;
@@ -1312,7 +1928,7 @@ namespace Avalonia.Win32.Interop
                 get
                 {
                     WINDOWPLACEMENT result = new WINDOWPLACEMENT();
-                    result.Length = Marshal.SizeOf(result);
+                    result.Length = Marshal.SizeOf<WINDOWPLACEMENT>();
                     return result;
                 }
             }
@@ -1349,6 +1965,16 @@ namespace Avalonia.Win32.Interop
             public int CxContact;
             public int CyContact;
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct ICONINFO
+        {
+            public bool IsIcon;
+            public int xHotspot;
+            public int yHotspot;
+            public IntPtr MaskBitmap;
+            public IntPtr ColorBitmap;
+        };
 
         [Flags]
         public enum TouchInputFlags
@@ -1398,7 +2024,7 @@ namespace Avalonia.Win32.Interop
             OFN_NOREADONLYRETURN = 0x00008000,
             OFN_OVERWRITEPROMPT = 0x00000002
         }
-        
+
         public enum HRESULT : uint
         {
             S_FALSE = 0x0001,
@@ -1406,7 +2032,8 @@ namespace Avalonia.Win32.Interop
             E_INVALIDARG = 0x80070057,
             E_OUTOFMEMORY = 0x8007000E,
             E_NOTIMPL = 0x80004001,
-            E_UNEXPECTED = 0x8000FFFF
+            E_UNEXPECTED = 0x8000FFFF,
+            E_CANCELLED = 0x800704C7,
         }
 
         public enum Icons
@@ -1415,261 +2042,14 @@ namespace Avalonia.Win32.Interop
             ICON_BIG = 1
         }
 
-        public const uint SIGDN_FILESYSPATH = 0x80058000;
-
-        [Flags]
-        public enum FOS : uint
-        {
-            FOS_OVERWRITEPROMPT = 0x00000002,
-            FOS_STRICTFILETYPES = 0x00000004,
-            FOS_NOCHANGEDIR = 0x00000008,
-            FOS_PICKFOLDERS = 0x00000020,
-            FOS_FORCEFILESYSTEM = 0x00000040, // Ensure that items returned are filesystem items.
-            FOS_ALLNONSTORAGEITEMS = 0x00000080, // Allow choosing items that have no storage.
-            FOS_NOVALIDATE = 0x00000100,
-            FOS_ALLOWMULTISELECT = 0x00000200,
-            FOS_PATHMUSTEXIST = 0x00000800,
-            FOS_FILEMUSTEXIST = 0x00001000,
-            FOS_CREATEPROMPT = 0x00002000,
-            FOS_SHAREAWARE = 0x00004000,
-            FOS_NOREADONLYRETURN = 0x00008000,
-            FOS_NOTESTFILECREATE = 0x00010000,
-            FOS_HIDEMRUPLACES = 0x00020000,
-            FOS_HIDEPINNEDPLACES = 0x00040000,
-            FOS_NODEREFERENCELINKS = 0x00100000,
-            FOS_DONTADDTORECENT = 0x02000000,
-            FOS_FORCESHOWHIDDEN = 0x10000000,
-            FOS_DEFAULTNOMINIMODE = 0x20000000
-        }
-
         public static class ShellIds
         {
             public static readonly Guid OpenFileDialog = Guid.Parse("DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7");
             public static readonly Guid SaveFileDialog = Guid.Parse("C0B4E2F3-BA21-4773-8DBA-335EC946EB8B");
             public static readonly Guid IFileDialog = Guid.Parse("42F85136-DB7E-439C-85F1-E4075D135FC8");
             public static readonly Guid IShellItem = Guid.Parse("43826D1E-E718-42EE-BC55-A1E261C37BFE");
-        }
-
-        [ComImport(), Guid("42F85136-DB7E-439C-85F1-E4075D135FC8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-        public interface IFileDialog
-        {
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            [PreserveSig()]
-            uint Show([In, Optional] IntPtr hwndOwner); //IModalWindow
-
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetFileTypes(uint cFileTypes, [In, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 0)] COMDLG_FILTERSPEC[] rgFilterSpec);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetFileTypeIndex([In] uint iFileType);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint GetFileTypeIndex(out uint piFileType);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint Advise([In, MarshalAs(UnmanagedType.Interface)] IntPtr pfde, out uint pdwCookie);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint Unadvise([In] uint dwCookie);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetOptions([In] uint fos);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint GetOptions(out uint fos);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void SetDefaultFolder([In, MarshalAs(UnmanagedType.Interface)] IShellItem psi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetFolder([In, MarshalAs(UnmanagedType.Interface)] IShellItem psi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint GetFolder([MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint GetCurrentSelection([MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetFileName([In, MarshalAs(UnmanagedType.LPWStr)] string pszName);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string pszName);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetTitle([In, MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetOkButtonLabel([In, MarshalAs(UnmanagedType.LPWStr)] string pszText);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetFileNameLabel([In, MarshalAs(UnmanagedType.LPWStr)] string pszLabel);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint GetResult([MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint AddPlace([In, MarshalAs(UnmanagedType.Interface)] IShellItem psi, uint fdap);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetDefaultExtension([In, MarshalAs(UnmanagedType.LPWStr)] string pszDefaultExtension);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint Close([MarshalAs(UnmanagedType.Error)] uint hr);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetClientGuid([In] ref Guid guid);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint ClearClientData();
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetFilter([MarshalAs(UnmanagedType.Interface)] IntPtr pFilter);
-
-        }
-
-        [ComImport, Guid("d57c7288-d4ad-4768-be02-9d969532d960"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-        public interface IFileOpenDialog
-        {
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            [PreserveSig()]
-            uint Show([In, Optional] IntPtr hwndOwner); //IModalWindow 
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetFileTypes([In] uint cFileTypes, [In, MarshalAs(UnmanagedType.LPArray)] IntPtr rgFilterSpec);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void SetFileTypeIndex([In] uint iFileType);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetFileTypeIndex(out uint piFileType);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint Advise([In, MarshalAs(UnmanagedType.Interface)] IntPtr pfde, out uint pdwCookie);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void Unadvise([In] uint dwCookie);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint SetOptions([In] uint fos);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint GetOptions(out uint fos);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void SetDefaultFolder([In, MarshalAs(UnmanagedType.Interface)] IShellItem psi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void SetFolder([In, MarshalAs(UnmanagedType.Interface)] IShellItem psi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetFolder([MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetCurrentSelection([MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void SetFileName([In, MarshalAs(UnmanagedType.LPWStr)] string pszName);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string pszName);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void SetTitle([In, MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void SetOkButtonLabel([In, MarshalAs(UnmanagedType.LPWStr)] string pszText);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void SetFileNameLabel([In, MarshalAs(UnmanagedType.LPWStr)] string pszLabel);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetResult([MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint AddPlace([In, MarshalAs(UnmanagedType.Interface)] IShellItem psi, uint fdap);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void SetDefaultExtension([In, MarshalAs(UnmanagedType.LPWStr)] string pszDefaultExtension);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void Close([MarshalAs(UnmanagedType.Error)] int hr);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void SetClientGuid([In] ref Guid guid);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void ClearClientData();
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void SetFilter([MarshalAs(UnmanagedType.Interface)] IntPtr pFilter);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetResults([MarshalAs(UnmanagedType.Interface)] out IShellItemArray ppenum);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetSelectedItems([MarshalAs(UnmanagedType.Interface)] out IShellItemArray ppsai);
-        }
-
-        [ComImport, Guid("B63EA76D-1F85-456F-A19C-48159EFA858B"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-        public interface IShellItemArray
-        {
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void BindToHandler([In, MarshalAs(UnmanagedType.Interface)] IntPtr pbc, [In] ref Guid rbhid,
-                         [In] ref Guid riid, out IntPtr ppvOut);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetPropertyStore([In] int Flags, [In] ref Guid riid, out IntPtr ppv);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetPropertyDescriptionList([In] ref PROPERTYKEY keyType, [In] ref Guid riid, out IntPtr ppv);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetAttributes([In] SIATTRIBFLAGS dwAttribFlags, [In] uint sfgaoMask, out uint psfgaoAttribs);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetCount(out uint pdwNumItems);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void GetItemAt([In] uint dwIndex, [MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            void EnumItems([MarshalAs(UnmanagedType.Interface)] out IntPtr ppenumShellItems);
-        }
-
-        [StructLayout(LayoutKind.Sequential, Pack = 4)]
-        public struct PROPERTYKEY
-        {
-            public Guid fmtid;
-            public uint pid;
-        }
-
-        public enum SIATTRIBFLAGS
-        {
-            SIATTRIBFLAGS_AND = 1,
-            SIATTRIBFLAGS_APPCOMPAT = 3,
-            SIATTRIBFLAGS_OR = 2
-        }
-
-        [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-        public interface IShellItem
-        {
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint BindToHandler([In] IntPtr pbc, [In] ref Guid rbhid, [In] ref Guid riid, [Out, MarshalAs(UnmanagedType.Interface)] out IntPtr ppvOut);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint GetParent([MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint GetDisplayName([In] uint sigdnName, out IntPtr ppszName);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint GetAttributes([In] uint sfgaoMask, out uint psfgaoAttribs);
-
-            [MethodImpl(MethodImplOptions.InternalCall, MethodCodeType = MethodCodeType.Runtime)]
-            uint Compare([In, MarshalAs(UnmanagedType.Interface)] IShellItem psi, [In] uint hint, out int piOrder);
-
+            public static readonly Guid TaskBarList = Guid.Parse("56FDF344-FD6D-11D0-958A-006097C9A090");
+            public static readonly Guid ITaskBarList2 = Guid.Parse("ea1afb91-9e28-4b86-90e9-9e9f8a5eefaf");
         }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -1680,65 +2060,23 @@ namespace Avalonia.Win32.Interop
             [MarshalAs(UnmanagedType.LPWStr)]
             public string pszSpec;
         }
+
+        public delegate void MarkFullscreenWindow(IntPtr This, IntPtr hwnd, [MarshalAs(UnmanagedType.Bool)] bool fullscreen);
+        public delegate HRESULT HrInit(IntPtr This);
+
+        public struct ITaskBarList2VTable
+        {
+            public IntPtr IUnknown1;
+            public IntPtr IUnknown2;
+            public IntPtr IUnknown3;
+            public IntPtr HrInit;
+            public IntPtr AddTab;
+            public IntPtr DeleteTab;
+            public IntPtr ActivateTab;
+            public IntPtr SetActiveAlt;
+            public IntPtr MarkFullscreenWindow;
+        }
     }
-
-    [Flags]
-    internal enum DropEffect : int
-    {
-        None = 0,
-        Copy = 1,
-        Move = 2,
-        Link = 4,
-        Scroll = -2147483648,
-    }
-
-    [ComImport]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    [Guid("00000122-0000-0000-C000-000000000046")]
-    internal interface IDropTarget
-    {
-        [PreserveSig]
-        UnmanagedMethods.HRESULT DragEnter([MarshalAs(UnmanagedType.Interface)] [In] IOleDataObject pDataObj, [MarshalAs(UnmanagedType.U4)] [In] int grfKeyState, [MarshalAs(UnmanagedType.U8)] [In] long pt, [In] [Out] ref DropEffect pdwEffect);
-        [PreserveSig]
-        UnmanagedMethods.HRESULT DragOver([MarshalAs(UnmanagedType.U4)] [In] int grfKeyState, [MarshalAs(UnmanagedType.U8)] [In] long pt, [In] [Out] ref DropEffect pdwEffect);
-        [PreserveSig]
-        UnmanagedMethods.HRESULT DragLeave();
-        [PreserveSig]
-        UnmanagedMethods.HRESULT Drop([MarshalAs(UnmanagedType.Interface)] [In] IOleDataObject pDataObj, [MarshalAs(UnmanagedType.U4)] [In] int grfKeyState, [MarshalAs(UnmanagedType.U8)] [In] long pt, [In] [Out] ref DropEffect pdwEffect);
-    }
-
-    [ComImport]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    [Guid("00000121-0000-0000-C000-000000000046")]
-    internal interface IDropSource
-    {
-        [PreserveSig]
-        int QueryContinueDrag(int fEscapePressed, [MarshalAs(UnmanagedType.U4)] [In] int grfKeyState);
-        [PreserveSig]
-        int GiveFeedback([MarshalAs(UnmanagedType.U4)] [In] int dwEffect);
-    }
-
-
-    [ComImport]
-    [Guid("0000010E-0000-0000-C000-000000000046")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface IOleDataObject
-    {
-        void GetData([In] ref FORMATETC format, out STGMEDIUM medium);
-        void GetDataHere([In] ref FORMATETC format, ref STGMEDIUM medium);
-        [PreserveSig]
-        int QueryGetData([In] ref FORMATETC format);
-        [PreserveSig]
-        int GetCanonicalFormatEtc([In] ref FORMATETC formatIn, out FORMATETC formatOut);
-        void SetData([In] ref FORMATETC formatIn, [In] ref STGMEDIUM medium, [MarshalAs(UnmanagedType.Bool)] bool release);
-        IEnumFORMATETC EnumFormatEtc(DATADIR direction);
-        [PreserveSig]
-        int DAdvise([In] ref FORMATETC pFormatetc, ADVF advf, IAdviseSink adviseSink, out int connection);
-        void DUnadvise(int connection);
-        [PreserveSig]
-        int EnumDAdvise(out IEnumSTATDATA enumAdvise);
-    }
-
 
     [StructLayoutAttribute(LayoutKind.Sequential)]
     internal struct _DROPFILES
@@ -1748,5 +2086,133 @@ namespace Avalonia.Win32.Interop
         public Int32 Y;
         public bool fNC;
         public bool fWide;
+    }
+
+    [StructLayoutAttribute(LayoutKind.Sequential)]
+    internal struct STGMEDIUM
+    {
+        public TYMED tymed;
+        public IntPtr unionmember;
+        public IntPtr pUnkForRelease;
+    }
+
+    [StructLayoutAttribute(LayoutKind.Sequential)]
+    internal struct FORMATETC
+    {
+        public ushort cfFormat;
+        public IntPtr ptd;
+        public DVASPECT dwAspect;
+        public int lindex;
+        public TYMED tymed;
+    }
+
+    [Flags]
+    internal enum PixelFormatDescriptorFlags : uint
+    {
+        PFD_DOUBLEBUFFER = 0x00000001,
+        PFD_STEREO = 0x00000002,
+        PFD_DRAW_TO_WINDOW = 0x00000004,
+        PFD_DRAW_TO_BITMAP = 0x00000008,
+        PFD_SUPPORT_GDI = 0x00000010,
+        PFD_SUPPORT_OPENGL = 0x00000020,
+        PFD_GENERIC_FORMAT = 0x00000040,
+        PFD_NEED_PALETTE = 0x00000080,
+        PFD_NEED_SYSTEM_PALETTE = 0x00000100,
+        PFD_SWAP_EXCHANGE = 0x00000200,
+        PFD_SWAP_COPY = 0x00000400,
+        PFD_SWAP_LAYER_BUFFERS = 0x00000800,
+        PFD_GENERIC_ACCELERATED = 0x00001000,
+        PFD_SUPPORT_DIRECTDRAW = 0x00002000,
+        PFD_DEPTH_DONTCARE = 0x20000000,
+        PFD_DOUBLEBUFFER_DONTCARE = 0x40000000,
+        PFD_STEREO_DONTCARE = 0x80000000,
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct PixelFormatDescriptor
+    {
+        public ushort Size;
+        public ushort Version;
+        public PixelFormatDescriptorFlags Flags;
+        public byte PixelType;
+        public byte ColorBits;
+        public byte RedBits;
+        public byte RedShift;
+        public byte GreenBits;
+        public byte GreenShift;
+        public byte BlueBits;
+        public byte BlueShift;
+        public byte AlphaBits;
+        public byte AlphaShift;
+        public byte AccumBits;
+        public byte AccumRedBits;
+        public byte AccumGreenBits;
+        public byte AccumBlueBits;
+        public byte AccumAlphaBits;
+        public byte DepthBits;
+        public byte StencilBits;
+        public byte AuxBuffers;
+        public byte LayerType;
+        private byte Reserved;
+        public uint LayerMask;
+        public uint VisibleMask;
+        public uint DamageMask;
+    }
+
+    internal enum NIM : uint
+    {
+        ADD = 0x00000000,
+        MODIFY = 0x00000001,
+        DELETE = 0x00000002,
+        SETFOCUS = 0x00000003,
+        SETVERSION = 0x00000004
+    }
+
+    [Flags]
+    internal enum NIF : uint
+    {
+        MESSAGE = 0x00000001,
+        ICON = 0x00000002,
+        TIP = 0x00000004,
+        STATE = 0x00000008,
+        INFO = 0x00000010,
+        GUID = 0x00000020,
+        REALTIME = 0x00000040,
+        SHOWTIP = 0x00000080
+    }
+
+    [Flags]
+    internal enum NIIF : uint
+    {
+        NONE = 0x00000000,
+        INFO = 0x00000001,
+        WARNING = 0x00000002,
+        ERROR = 0x00000003,
+        USER = 0x00000004,
+        ICON_MASK = 0x0000000F,
+        NOSOUND = 0x00000010,
+        LARGE_ICON = 0x00000020,
+        RESPECT_QUIET_TIME = 0x00000080
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    internal class NOTIFYICONDATA
+    {
+        public int cbSize = Marshal.SizeOf<NOTIFYICONDATA>();
+        public IntPtr hWnd;
+        public int uID;
+        public NIF uFlags;
+        public int uCallbackMessage;
+        public IntPtr hIcon;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string szTip;
+        public int dwState = 0;
+        public int dwStateMask = 0;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public string szInfo;
+        public int uTimeoutOrVersion;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string szInfoTitle;
+        public NIIF dwInfoFlags;
     }
 }

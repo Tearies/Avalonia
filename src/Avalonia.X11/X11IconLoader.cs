@@ -2,12 +2,9 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using Avalonia.Controls.Platform.Surfaces;
-using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using Avalonia.Utilities;
-using Avalonia.Visuals.Media.Imaging;
-using static Avalonia.X11.XLib;
+
 namespace Avalonia.X11
 {
     class X11IconLoader : IPlatformIconLoader
@@ -59,7 +56,7 @@ namespace Avalonia.X11
             }
             using(var rt = AvaloniaLocator.Current.GetService<IPlatformRenderInterface>().CreateRenderTarget(new[]{this}))
             using (var ctx = rt.CreateDrawingContext(null))
-                ctx.DrawImage(bitmap.PlatformImpl, 1, new Rect(bitmap.Size),
+                ctx.DrawBitmap(bitmap.PlatformImpl, 1, new Rect(bitmap.Size),
                     new Rect(0, 0, _width, _height));
             Data = new UIntPtr[_width * _height + 2];
             Data[0] = new UIntPtr((uint)_width);
@@ -77,7 +74,9 @@ namespace Avalonia.X11
         public void Save(Stream outputStream)
         {
             using (var wr =
+#pragma warning disable CS0618 // Type or member is obsolete
                 new WriteableBitmap(new PixelSize(_width, _height), new Vector(96, 96), PixelFormat.Bgra8888))
+#pragma warning restore CS0618 // Type or member is obsolete
             {
                 using (var fb = wr.Lock())
                 {

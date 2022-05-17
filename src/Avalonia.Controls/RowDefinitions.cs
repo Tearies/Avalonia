@@ -1,8 +1,4 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System.Linq;
-using Avalonia.Collections;
 
 namespace Avalonia.Controls
 {
@@ -26,6 +22,11 @@ namespace Avalonia.Controls
             : this()
         {
             AddRange(GridLength.ParseLengths(s).Select(x => new RowDefinition(x)));
+        }
+
+        public override string ToString()
+        {
+            return string.Join(",", this.Select(x => x.Height));
         }
 
         /// <summary>

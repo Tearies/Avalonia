@@ -1,18 +1,19 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System.Collections;
 using Avalonia.Controls.Generators;
+using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Selection;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 
 namespace Avalonia.Controls
 {
     /// <summary>
     /// An <see cref="ItemsControl"/> in which individual items can be selected.
     /// </summary>
+    [TemplatePart("PART_ScrollViewer", typeof(IScrollable))]
     public class ListBox : SelectingItemsControl
     {
         /// <summary>
@@ -24,14 +25,20 @@ namespace Avalonia.Controls
         /// <summary>
         /// Defines the <see cref="Scroll"/> property.
         /// </summary>
-        public static readonly DirectProperty<ListBox, IScrollable> ScrollProperty =
-            AvaloniaProperty.RegisterDirect<ListBox, IScrollable>(nameof(Scroll), o => o.Scroll);
+        public static readonly DirectProperty<ListBox, IScrollable?> ScrollProperty =
+            AvaloniaProperty.RegisterDirect<ListBox, IScrollable?>(nameof(Scroll), o => o.Scroll);
 
         /// <summary>
         /// Defines the <see cref="SelectedItems"/> property.
         /// </summary>
-        public static readonly new DirectProperty<SelectingItemsControl, IList> SelectedItemsProperty =
+        public static readonly new DirectProperty<SelectingItemsControl, IList?> SelectedItemsProperty =
             SelectingItemsControl.SelectedItemsProperty;
+
+        /// <summary>
+        /// Defines the <see cref="Selection"/> property.
+        /// </summary>
+        public static readonly new DirectProperty<SelectingItemsControl, ISelectionModel> SelectionProperty =
+            SelectingItemsControl.SelectionProperty;
 
         /// <summary>
         /// Defines the <see cref="SelectionMode"/> property.
@@ -45,7 +52,7 @@ namespace Avalonia.Controls
         public static readonly StyledProperty<ItemVirtualizationMode> VirtualizationModeProperty =
             ItemsPresenter.VirtualizationModeProperty.AddOwner<ListBox>();
 
-        private IScrollable _scroll;
+        private IScrollable? _scroll;
 
         /// <summary>
         /// Initializes static members of the <see cref="ItemsControl"/> class.
@@ -59,21 +66,32 @@ namespace Avalonia.Controls
         /// <summary>
         /// Gets the scroll information for the <see cref="ListBox"/>.
         /// </summary>
-        public IScrollable Scroll
+        public IScrollable? Scroll
         {
             get { return _scroll; }
             private set { SetAndRaise(ScrollProperty, ref _scroll, value); }
         }
 
         /// <inheritdoc/>
-        public new IList SelectedItems => base.SelectedItems;
+        public new IList? SelectedItems
+        {
+            get => base.SelectedItems;
+            set => base.SelectedItems = value;
+        }
+
+        /// <inheritdoc/>
+        public new ISelectionModel Selection
+        {
+            get => base.Selection;
+            set => base.Selection = value;
+        }
 
         /// <summary>
         /// Gets or sets the selection mode.
         /// </summary>
         /// <remarks>
         /// Note that the selection mode only applies to selections made via user interaction.
-        /// Multiple selections can be made programatically regardless of the value of this property.
+        /// Multiple selections can be made programmatically regardless of the value of this property.
         /// </remarks>
         public new SelectionMode SelectionMode
         {
@@ -93,12 +111,12 @@ namespace Avalonia.Controls
         /// <summary>
         /// Selects all items in the <see cref="ListBox"/>.
         /// </summary>
-        public new void SelectAll() => base.SelectAll();
+        public void SelectAll() => Selection.SelectAll();
 
         /// <summary>
         /// Deselects all items in the <see cref="ListBox"/>.
         /// </summary>
-        public new void UnselectAll() => base.UnselectAll();
+        public void UnselectAll() => Selection.Clear();
 
         /// <inheritdoc/>
         protected override IItemContainerGenerator CreateItemContainerGenerator()
@@ -119,7 +137,8 @@ namespace Avalonia.Controls
                 e.Handled = UpdateSelectionFromEventSource(
                     e.Source,
                     true,
-                    (e.InputModifiers & InputModifiers.Shift) != 0);
+                    e.KeyModifiers.HasAllFlags(KeyModifiers.Shift),
+                    e.KeyModifiers.HasAllFlags(KeyModifiers.Control));
             }
         }
 
@@ -128,20 +147,25 @@ namespace Avalonia.Controls
         {
             base.OnPointerPressed(e);
 
-            if (e.MouseButton == MouseButton.Left || e.MouseButton == MouseButton.Right)
+            if (e.Source is IVisual source)
             {
-                e.Handled = UpdateSelectionFromEventSource(
-                    e.Source,
-                    true,
-                    (e.InputModifiers & InputModifiers.Shift) != 0,
-                    (e.InputModifiers & InputModifiers.Control) != 0,
-                    e.MouseButton == MouseButton.Right);
+                var point = e.GetCurrentPoint(source);
+
+                if (point.Properties.IsLeftButtonPressed || point.Properties.IsRightButtonPressed)
+                {
+                    e.Handled = UpdateSelectionFromEventSource(
+                        e.Source,
+                        true,
+                        e.KeyModifiers.HasAllFlags(KeyModifiers.Shift),
+                        e.KeyModifiers.HasAllFlags(KeyModifiers.Control),
+                        point.Properties.IsRightButtonPressed);
+                }
             }
         }
 
-        protected override void OnTemplateApplied(TemplateAppliedEventArgs e)
+        protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
         {
-            base.OnTemplateApplied(e);
+            base.OnApplyTemplate(e);
             Scroll = e.NameScope.Find<IScrollable>("PART_ScrollViewer");
         }
     }

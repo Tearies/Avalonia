@@ -4,13 +4,13 @@ using Avalonia.LogicalTree;
 
 namespace Avalonia.Markup.Parsers.Nodes
 {
-    internal class FindAncestorNode : ExpressionNode
+    public class FindAncestorNode : ExpressionNode
     {
         private readonly int _level;
-        private readonly Type _ancestorType;
-        private IDisposable _subscription;
+        private readonly Type? _ancestorType;
+        private IDisposable? _subscription;
 
-        public FindAncestorNode(Type ancestorType, int level)
+        public FindAncestorNode(Type? ancestorType, int level)
         {
             _level = level;
             _ancestorType = ancestorType;
@@ -31,9 +31,9 @@ namespace Avalonia.Markup.Parsers.Nodes
             }
         }
 
-        protected override void StartListeningCore(WeakReference reference)
+        protected override void StartListeningCore(WeakReference<object?> reference)
         {
-            if (reference.Target is ILogical logical)
+            if (reference.TryGetTarget(out var target) && target is ILogical logical)
             {
                 _subscription = ControlLocator.Track(logical, _level, _ancestorType).Subscribe(ValueChanged);
             }

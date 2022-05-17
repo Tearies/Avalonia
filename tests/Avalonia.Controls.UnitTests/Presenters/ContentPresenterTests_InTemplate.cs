@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -341,6 +338,42 @@ namespace Avalonia.Controls.UnitTests.Presenters
 
             // InheritanceParent is exposed via StylingParent.
             Assert.Same(logicalParent, ((IStyledElement)child).StylingParent);
+        }
+
+        [Fact]
+        public void Should_Clear_Host_When_Host_Template_Cleared()
+        {
+            var (target, host) = CreateTarget();
+
+            Assert.Same(host, target.Host);
+
+            host.Template = null;
+            host.ApplyTemplate();
+
+            Assert.Null(target.Host);
+        }
+
+        [Fact]
+        public void Content_Should_Become_DataContext_When_ControlTemplate_Is_Not_Null()
+        {
+            var (target, _) = CreateTarget();
+
+            var textBlock = new TextBlock
+            {
+                [!TextBlock.TextProperty] = new Binding("Name"),
+            };
+
+            var canvas = new Canvas()
+            {
+                Name = "Canvas"
+            };
+
+            target.ContentTemplate = new FuncDataTemplate<Canvas>((_, __) => textBlock);
+            target.Content = canvas;
+
+            Assert.NotNull(target.DataContext);
+            Assert.Equal(canvas, target.DataContext);
+            Assert.Equal("Canvas", textBlock.Text);
         }
 
         (ContentPresenter presenter, ContentControl templatedParent) CreateTarget()

@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using System.Reactive.Linq;
@@ -120,7 +117,11 @@ namespace Avalonia.Markup.UnitTests.Parsers
             var result = run();
             result.Item1.Subscribe(x => { });
 
-            GC.Collect();
+            // Mono trickery
+            GC.Collect(2);
+            GC.WaitForPendingFinalizers();
+            GC.WaitForPendingFinalizers();
+            GC.Collect(2);
 
             Assert.Null(result.Item2.Target);
         }
@@ -130,7 +131,7 @@ namespace Avalonia.Markup.UnitTests.Parsers
         {
             var data = new Class1();
 
-            Assert.Throws<ExpressionParseException>(() => ExpressionObserverBuilder.Build(data, "(Owner)", typeResolver: _typeResolver));
+            Assert.Throws<ExpressionParseException>(() => ExpressionObserverBuilder.Build(data, "(Owner.)", typeResolver: _typeResolver));
         }
 
         [Fact]

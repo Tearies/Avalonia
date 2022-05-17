@@ -1,7 +1,4 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Specialized;
 using System.Linq;
@@ -111,12 +108,14 @@ namespace Avalonia.Controls.Presenters
             }
         }
 
+        public new IVirtualizingPanel VirtualizingPanel => base.VirtualizingPanel!;
+
         /// <inheritdoc/>
         public override Size MeasureOverride(Size availableSize)
         {
             var scrollable = (ILogicalScrollable)Owner;
             var visualRoot = Owner.GetVisualRoot();
-            var maxAvailableSize = (visualRoot as WindowBase)?.PlatformImpl?.MaxClientSize
+            var maxAvailableSize = (visualRoot as WindowBase)?.PlatformImpl?.MaxAutoSizeHint
                  ?? (visualRoot as TopLevel)?.ClientSize;
 
             // If infinity is passed as the available size and we're virtualized then we need to
@@ -154,7 +153,7 @@ namespace Avalonia.Controls.Presenters
                 }
             }
 
-            Owner.Panel.Measure(availableSize);
+            Owner.Panel!.Measure(availableSize);
             return Owner.Panel.DesiredSize;
         }
 
@@ -166,7 +165,7 @@ namespace Avalonia.Controls.Presenters
         }
 
         /// <inheritdoc/>
-        public override void ItemsChanged(IEnumerable items, NotifyCollectionChangedEventArgs e)
+        public override void ItemsChanged(IEnumerable? items, NotifyCollectionChangedEventArgs e)
         {
             base.ItemsChanged(items, e);
 
@@ -188,8 +187,8 @@ namespace Avalonia.Controls.Presenters
                         break;
 
                     case NotifyCollectionChangedAction.Remove:
-                        if (e.OldStartingIndex >= FirstIndex &&
-                            e.OldStartingIndex < NextIndex)
+                        if ((e.OldStartingIndex >= FirstIndex && e.OldStartingIndex < NextIndex) ||
+                            panel.Children.Count > ItemCount)
                         {
                             RecycleContainersOnRemove();
                         }
@@ -227,17 +226,12 @@ namespace Avalonia.Controls.Presenters
             InvalidateScroll();
         }
 
-        public override IControl GetControlInDirection(NavigationDirection direction, IControl from)
+        public override IControl? GetControlInDirection(NavigationDirection direction, IControl? from)
         {
             var generator = Owner.ItemContainerGenerator;
             var panel = VirtualizingPanel;
             var itemIndex = generator.IndexFromContainer(from);
             var vertical = VirtualizingPanel.ScrollDirection == Orientation.Vertical;
-
-            if (itemIndex == -1)
-            {
-                return null;
-            }
 
             var newItemIndex = -1;
 
@@ -251,6 +245,16 @@ namespace Avalonia.Controls.Presenters
                     newItemIndex = ItemCount - 1;
                     break;
 
+                default:
+                    if (itemIndex == -1)
+                    {
+                        return null;
+                    }
+                    break;
+            }
+
+            switch (direction)
+            {
                 case NavigationDirection.Up:
                     if (vertical)
                     {
@@ -289,17 +293,15 @@ namespace Avalonia.Controls.Presenters
                     break;
             }
 
-            return ScrollIntoView(newItemIndex);
+            return ScrollIntoViewCore(newItemIndex);
         }
 
         /// <inheritdoc/>
-        public override void ScrollIntoView(object item)
+        public override void ScrollIntoView(int index)
         {
-            var index = Items.IndexOf(item);
-
             if (index != -1)
             {
-                ScrollIntoView(index);
+                ScrollIntoViewCore(index);
             }
         }
 
@@ -336,7 +338,7 @@ namespace Avalonia.Controls.Presenters
                         }
                     }
 
-                    var materialized = generator.Materialize(index, Items.ElementAt(index));
+                    var materialized = generator.Materialize(index, Items.ElementAt(index)!);
 
                     if (step == 1)
                     {
@@ -387,7 +389,7 @@ namespace Avalonia.Controls.Presenters
 
             foreach (var container in containers)
             {
-                var item = Items.ElementAt(itemIndex);
+                var item = Items!.ElementAt(itemIndex)!;
 
                 if (!object.Equals(container.Item, item))
                 {
@@ -432,7 +434,7 @@ namespace Avalonia.Controls.Presenters
                 var oldItemIndex = FirstIndex + first + i;
                 var newItemIndex = oldItemIndex + delta + ((panel.Children.Count - count) * sign);
 
-                var item = Items.ElementAt(newItemIndex);
+                var item = Items!.ElementAt(newItemIndex)!;
 
                 if (!generator.TryRecycle(oldItemIndex, newItemIndex, item))
                 {
@@ -511,11 +513,26 @@ namespace Avalonia.Controls.Presenters
         /// </summary>
         /// <param name="index">The item index.</param>
         /// <returns>The container that was brought into view.</returns>
-        private IControl ScrollIntoView(int index)
+        private IControl? ScrollIntoViewCore(int index)
         {
             var panel = VirtualizingPanel;
             var generator = Owner.ItemContainerGenerator;
             var newOffset = -1.0;
+
+            //better not trigger any container generation/recycle while  or layout stuff
+            //before panel is attached/visible
+            if (!panel.IsAttachedToVisualTree)
+            {
+                return null;
+            }
+
+            if (!panel.IsMeasureValid && panel.PreviousMeasure.HasValue)
+            {
+                //before any kind of scrolling we need to make sure panel measure is valid
+                //or we risk get panel into not valid state
+                //we make a preemptive quick measure so scrolling is valid
+                panel.Measure(panel.PreviousMeasure.Value);
+            }
 
             if (index >= 0 && index < ItemCount)
             {

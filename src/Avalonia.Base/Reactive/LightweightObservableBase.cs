@@ -18,12 +18,13 @@ namespace Avalonia.Reactive
     /// </remarks>
     public abstract class LightweightObservableBase<T> : IObservable<T>
     {
-        private Exception _error;
-        private List<IObserver<T>> _observers = new List<IObserver<T>>();
+        private Exception? _error;
+        private List<IObserver<T>>? _observers = new List<IObserver<T>>();
 
         public IDisposable Subscribe(IObserver<T> observer)
         {
-            Contract.Requires<ArgumentNullException>(observer != null);
+            _ = observer ?? throw new ArgumentNullException(nameof(observer));
+
             Dispatcher.UIThread.VerifyAccess();
 
             var first = false;
@@ -91,9 +92,9 @@ namespace Avalonia.Reactive
 
         sealed class RemoveObserver : IDisposable
         {
-            LightweightObservableBase<T> _parent;
+            LightweightObservableBase<T>? _parent;
 
-            IObserver<T> _observer;
+            IObserver<T>? _observer;
 
             public RemoveObserver(LightweightObservableBase<T> parent, IObserver<T> observer)
             {
@@ -104,7 +105,7 @@ namespace Avalonia.Reactive
             public void Dispose()
             {
                 var observer = _observer;
-                Interlocked.Exchange(ref _parent, null)?.Remove(observer);
+                Interlocked.Exchange(ref _parent, null)?.Remove(observer!);
                 _observer = null;
             }
         }
@@ -116,20 +117,33 @@ namespace Avalonia.Reactive
         {
             if (Volatile.Read(ref _observers) != null)
             {
-                IObserver<T>[] observers;
-
+                IObserver<T>[]? observers = null;
+                IObserver<T>? singleObserver = null;
                 lock (this)
                 {
                     if (_observers == null)
                     {
                         return;
                     }
-                    observers = _observers.ToArray();
+                    if (_observers.Count == 1)
+                    {
+                        singleObserver = _observers[0];
+                    }
+                    else
+                    {
+                        observers = _observers.ToArray();
+                    }
                 }
-
-                foreach (var observer in observers)
+                if (singleObserver != null)
                 {
-                    observer.OnNext(value);
+                    singleObserver.OnNext(value);
+                }
+                else
+                {
+                    foreach (var observer in observers!)
+                    {
+                        observer.OnNext(value);
+                    }
                 }
             }
         }

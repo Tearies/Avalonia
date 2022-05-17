@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
@@ -9,6 +6,7 @@ using Avalonia.Input.Raw;
 using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Platform;
+using Avalonia.Styling;
 using Avalonia.UnitTests;
 using Moq;
 using Xunit;
@@ -95,7 +93,7 @@ namespace Avalonia.Controls.UnitTests
             {
                 var impl = new Mock<ITopLevelImpl>();
                 impl.SetupProperty(x => x.Resized);
-                impl.SetupGet(x => x.Scaling).Returns(1);
+                impl.SetupGet(x => x.RenderScaling).Returns(1);
 
                 var target = new TestTopLevel(impl.Object)
                 {
@@ -108,7 +106,7 @@ namespace Avalonia.Controls.UnitTests
                     }
                 };
 
-                target.LayoutManager.ExecuteInitialLayoutPass(target);
+                target.LayoutManager.ExecuteInitialLayoutPass();
 
                 Assert.Equal(new Rect(0, 0, 321, 432), target.Bounds);
             }
@@ -141,7 +139,7 @@ namespace Avalonia.Controls.UnitTests
 
                 // The user has resized the window, so we can no longer auto-size.
                 var target = new TestTopLevel(impl.Object);
-                impl.Object.Resized(new Size(100, 200));
+                impl.Object.Resized(new Size(100, 200), PlatformResizeReason.Unspecified);
 
                 Assert.Equal(100, target.Width);
                 Assert.Equal(200, target.Height);
@@ -167,9 +165,37 @@ namespace Avalonia.Controls.UnitTests
         }
 
         [Fact]
+        public void Impl_Close_Should_Raise_DetachedFromLogicalTree_Event()
+        {
+            using (UnitTestApplication.Start(TestServices.StyledWindow))
+            {
+                var impl = new Mock<ITopLevelImpl>();
+                impl.SetupAllProperties();
+
+                var target = new TestTopLevel(impl.Object);
+                var raised = 0;
+
+                target.DetachedFromLogicalTree += (s, e) =>
+                {
+                    Assert.Same(target, e.Root);
+                    Assert.Same(target, e.Source);
+                    Assert.Null(e.Parent);
+                    ++raised;
+                };
+
+                impl.Object.Closed();
+
+                Assert.Equal(1, raised);
+            }
+        }
+
+        [Fact]
         public void Impl_Input_Should_Pass_Input_To_InputManager()
         {
             var inputManagerMock = new Mock<IInputManager>();
+            inputManagerMock.DefaultValue = DefaultValue.Mock;
+            inputManagerMock.SetupAllProperties();
+
             var services = TestServices.StyledWindow.With(inputManager: inputManagerMock.Object);
 
             using (UnitTestApplication.Start(services))
@@ -182,6 +208,7 @@ namespace Avalonia.Controls.UnitTests
                 var input = new RawKeyEventArgs(
                     new Mock<IKeyboardDevice>().Object,
                     0,
+                    target,
                     RawKeyEventType.KeyDown,
                     Key.A, RawInputModifiers.None);
                 impl.Object.Input(input);
@@ -202,8 +229,9 @@ namespace Avalonia.Controls.UnitTests
 
                 target.Template = CreateTemplate();
                 target.Content = child;
+                target.ApplyTemplate();
 
-                Assert.Throws<InvalidOperationException>(() => target.ApplyTemplate());
+                Assert.Throws<InvalidOperationException>(() => target.Presenter.ApplyTemplate());
             }
         }
 
@@ -221,6 +249,61 @@ namespace Avalonia.Controls.UnitTests
                 Application.Current.Resources.Add("foo", "bar");
 
                 Assert.True(raised);
+            }
+        }
+
+        [Fact]
+        public void Close_Should_Dispose_LayoutManager()
+        {
+            using (UnitTestApplication.Start(TestServices.StyledWindow))
+            {
+                var impl = new Mock<ITopLevelImpl>();
+                impl.SetupAllProperties();
+
+                var layoutManager = new Mock<ILayoutManager>();
+                var target = new TestTopLevel(impl.Object, layoutManager.Object);
+
+                impl.Object.Closed();
+
+                layoutManager.Verify(x => x.Dispose());
+            }
+        }
+
+        [Fact]
+        public void Reacts_To_Changes_In_Global_Styles()
+        {
+            using (UnitTestApplication.Start(TestServices.StyledWindow))
+            {
+                var impl = new Mock<ITopLevelImpl>();
+                impl.SetupGet(x => x.RenderScaling).Returns(1);
+
+                var child = new Border { Classes = { "foo" } };
+                var target = new TestTopLevel(impl.Object)
+                {
+                    Template = CreateTemplate(),
+                    Content = child,
+                };
+
+                target.LayoutManager.ExecuteInitialLayoutPass();
+
+                Assert.Equal(new Thickness(0), child.BorderThickness);
+
+                var style = new Style(x => x.OfType<Border>().Class("foo"))
+                {
+                    Setters =
+                    {
+                        new Setter(Border.BorderThicknessProperty, new Thickness(2))
+                    }
+                };
+
+                Application.Current.Styles.Add(style);
+                target.LayoutManager.ExecuteInitialLayoutPass();
+
+                Assert.Equal(new Thickness(2), child.BorderThickness);
+
+                Application.Current.Styles.Remove(style);
+
+                Assert.Equal(new Thickness(0), child.BorderThickness);
             }
         }
 
@@ -242,7 +325,7 @@ namespace Avalonia.Controls.UnitTests
             public TestTopLevel(ITopLevelImpl impl, ILayoutManager layoutManager = null)
                 : base(impl)
             {
-                _layoutManager = layoutManager ?? new LayoutManager();
+                _layoutManager = layoutManager ?? new LayoutManager(this);
             }
 
             protected override ILayoutManager CreateLayoutManager() => _layoutManager;

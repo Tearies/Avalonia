@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using System.Reactive.Linq;
@@ -8,6 +5,7 @@ using System.Reactive.Subjects;
 using Avalonia.Data;
 using Avalonia.Data.Core;
 using Avalonia.Markup.Parsers;
+using Avalonia.Threading;
 using Avalonia.UnitTests;
 using Xunit;
 
@@ -71,6 +69,8 @@ namespace Avalonia.Base.UnitTests.Data.Core
                 Assert.Equal(new[] { "foo" }, result);
 
                 sub.Dispose();
+                // Forces WeakEvent compact
+                Dispatcher.UIThread.RunJobs();
                 Assert.Equal(0, data.PropertyChangedSubscriptionCount);
 
                 GC.KeepAlive(data);
@@ -112,10 +112,16 @@ namespace Avalonia.Base.UnitTests.Data.Core
                 var sub = target.Subscribe(x => result.Add(x));
                 data1.Next.OnNext(data2);
                 sync.ExecutePostedCallbacks();
-
+                
+                // Forces WeakEvent compact
+                Dispatcher.UIThread.RunJobs();
                 Assert.Equal(new[] { new BindingNotification("foo") }, result);
 
                 sub.Dispose();
+                
+                // Forces WeakEvent compact
+                Dispatcher.UIThread.RunJobs();
+                
                 Assert.Equal(0, data1.PropertyChangedSubscriptionCount);
 
                 GC.KeepAlive(data1);

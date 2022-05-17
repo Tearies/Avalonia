@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.UnitTests;
@@ -10,6 +7,31 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
 {
     public class DataTemplateTests : XamlTestBase
     {
+        [Fact]
+        public void DataTemplate_Can_Be_Empty()
+        {
+            using (UnitTestApplication.Start(TestServices.StyledWindow))
+            {
+                var xaml = @"
+<Window xmlns='https://github.com/avaloniaui'
+        xmlns:sys='clr-namespace:System;assembly=netstandard'
+        xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
+    <Window.DataTemplates>
+        <DataTemplate DataType='{x:Type sys:String}' />
+    </Window.DataTemplates>
+    <ContentControl Name='target' Content='Foo'/>
+</Window>";
+                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
+                var target = window.FindControl<ContentControl>("target");
+
+                window.ApplyTemplate();
+                target.ApplyTemplate();
+                ((ContentPresenter)target.Presenter).UpdateChild();
+
+                Assert.Null(target.Presenter.Child);
+            }
+        }
+
         [Fact]
         public void DataTemplate_Can_Contain_Name()
         {
@@ -26,8 +48,7 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
     </Window.DataTemplates>
     <ContentControl Name='target' Content='Foo'/>
 </Window>";
-                var loader = new AvaloniaXamlLoader();
-                var window = (Window)loader.Load(xaml);
+                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
                 var target = window.FindControl<ContentControl>("target");
 
                 window.ApplyTemplate();
@@ -55,8 +76,7 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
         </ItemsControl.ItemTemplate>
     </ItemsControl>
 </Window>";
-                var loader = new AvaloniaXamlLoader();
-                var window = (Window)loader.Load(xaml);
+                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
                 var itemsControl = window.FindControl<ItemsControl>("itemsControl");
 
                 window.DataContext = new[] { "item1", "item2" };
@@ -84,8 +104,7 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
     </Window.DataTemplates>
     <ContentControl Name='target' Content='{Binding Child}'/>
 </Window>";
-                var loader = new AvaloniaXamlLoader();
-                var window = (Window)loader.Load(xaml);
+                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
                 var target = window.FindControl<ContentControl>("target");
 
                 var viewModel = new TestViewModel

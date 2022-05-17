@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using Avalonia.Controls;
 using Avalonia.Controls.Embedding;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
@@ -17,11 +18,11 @@ using MouseButton = System.Windows.Input.MouseButton;
 
 namespace Avalonia.Win32.Interop.Wpf
 {
-    class WpfTopLevelImpl : FrameworkElement, IEmbeddableWindowImpl
+    class WpfTopLevelImpl : FrameworkElement, ITopLevelImpl
     {
         private HwndSource _currentHwndSource;
         private readonly HwndSourceHook _hook;
-        private readonly IEmbeddableWindowImpl _ttl;
+        private readonly ITopLevelImpl _ttl;
         private IInputRoot _inputRoot;
         private readonly IEnumerable<object> _surfaces;
         private readonly IMouseDevice _mouse;
@@ -43,7 +44,7 @@ namespace Avalonia.Win32.Interop.Wpf
                 ((FrameworkElement)PlatformImpl)?.InvalidateMeasure();
             }
 
-            protected override void HandleResized(Size clientSize)
+            protected override void HandleResized(Size clientSize, PlatformResizeReason reason)
             {
                 ClientSize = clientSize;
                 LayoutManager.ExecuteLayoutPass();
@@ -74,7 +75,7 @@ namespace Avalonia.Win32.Interop.Wpf
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam, ref bool handled)
         {
             if (msg == (int)UnmanagedMethods.WindowsMessage.WM_DPICHANGED)
-                _ttl.ScalingChanged?.Invoke(_ttl.Scaling);
+                _ttl.ScalingChanged?.Invoke(_ttl.RenderScaling);
             return IntPtr.Zero;
         }
 
@@ -83,7 +84,7 @@ namespace Avalonia.Win32.Interop.Wpf
             _currentHwndSource?.RemoveHook(_hook);
             _currentHwndSource = e.NewSource as HwndSource;
             _currentHwndSource?.AddHook(_hook);
-            _ttl.ScalingChanged?.Invoke(_ttl.Scaling);
+            _ttl.ScalingChanged?.Invoke(_ttl.RenderScaling);
         }
 
         public IRenderer CreateRenderer(IRenderRoot root)
@@ -99,9 +100,10 @@ namespace Avalonia.Win32.Interop.Wpf
         }
 
         Size ITopLevelImpl.ClientSize => _finalSize;
+        Size? ITopLevelImpl.FrameSize => null;
         IMouseDevice ITopLevelImpl.MouseDevice => _mouse;
 
-        double ITopLevelImpl.Scaling => PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice.M11 ?? 1;
+        double ITopLevelImpl.RenderScaling => PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice.M11 ?? 1;
 
         IEnumerable<object> ITopLevelImpl.Surfaces => _surfaces;
 
@@ -112,7 +114,7 @@ namespace Avalonia.Win32.Interop.Wpf
             if (_finalSize == _previousSize)
                 return finalSize;
             _previousSize = _finalSize;
-            _ttl.Resized?.Invoke(finalSize.ToAvaloniaSize());
+            _ttl.Resized?.Invoke(finalSize.ToAvaloniaSize(), PlatformResizeReason.Unspecified);
             return base.ArrangeOverride(finalSize);
         }
 
@@ -146,13 +148,13 @@ namespace Avalonia.Win32.Interop.Wpf
         {
             var state = Keyboard.Modifiers;
             var rv = default(RawInputModifiers);
-            if (state.HasFlag(ModifierKeys.Windows))
+            if (state.HasAllFlags(ModifierKeys.Windows))
                 rv |= RawInputModifiers.Meta;
-            if (state.HasFlag(ModifierKeys.Alt))
+            if (state.HasAllFlags(ModifierKeys.Alt))
                 rv |= RawInputModifiers.Alt;
-            if (state.HasFlag(ModifierKeys.Control))
+            if (state.HasAllFlags(ModifierKeys.Control))
                 rv |= RawInputModifiers.Control;
-            if (state.HasFlag(ModifierKeys.Shift))
+            if (state.HasAllFlags(ModifierKeys.Shift))
                 rv |= RawInputModifiers.Shift;
             if (e != null)
             {
@@ -212,32 +214,35 @@ namespace Avalonia.Win32.Interop.Wpf
         protected override void OnMouseLeave(MouseEventArgs e) => MouseEvent(RawPointerEventType.LeaveWindow, e);
 
         protected override void OnKeyDown(KeyEventArgs e)
-            => _ttl.Input?.Invoke(new RawKeyEventArgs(_keyboard, (uint) e.Timestamp, RawKeyEventType.KeyDown,
+            => _ttl.Input?.Invoke(new RawKeyEventArgs(_keyboard, (uint) e.Timestamp, _inputRoot, RawKeyEventType.KeyDown,
                 (Key) e.Key,
                 GetModifiers(null)));
 
         protected override void OnKeyUp(KeyEventArgs e)
-            => _ttl.Input?.Invoke(new RawKeyEventArgs(_keyboard, (uint)e.Timestamp, RawKeyEventType.KeyUp,
+            => _ttl.Input?.Invoke(new RawKeyEventArgs(_keyboard, (uint)e.Timestamp, _inputRoot, RawKeyEventType.KeyUp,
                 (Key)e.Key,
                 GetModifiers(null)));
 
         protected override void OnTextInput(TextCompositionEventArgs e) 
-            => _ttl.Input?.Invoke(new RawTextInputEventArgs(_keyboard, (uint) e.Timestamp, e.Text));
+            => _ttl.Input?.Invoke(new RawTextInputEventArgs(_keyboard, (uint) e.Timestamp, _inputRoot, e.Text));
 
-        void ITopLevelImpl.SetCursor(IPlatformHandle cursor)
+        void ITopLevelImpl.SetCursor(ICursorImpl cursor)
         {
             if (cursor == null)
                 Cursor = Cursors.Arrow;
-            else if (cursor.HandleDescriptor == "HCURSOR")
-                Cursor = CursorShim.FromHCursor(cursor.Handle);
+            else if (cursor is IPlatformHandle handle)
+                Cursor = CursorShim.FromHCursor(handle.Handle);
         }
 
         Action<RawInputEventArgs> ITopLevelImpl.Input { get; set; } //TODO
         Action<Rect> ITopLevelImpl.Paint { get; set; }
-        Action<Size> ITopLevelImpl.Resized { get; set; }
+        Action<Size, PlatformResizeReason> ITopLevelImpl.Resized { get; set; }
         Action<double> ITopLevelImpl.ScalingChanged { get; set; }
+
+        Action<WindowTransparencyLevel> ITopLevelImpl.TransparencyLevelChanged { get; set; }
+
         Action ITopLevelImpl.Closed { get; set; }
-        public new event Action LostFocus;
+        public new Action LostFocus { get; set; }
 
         internal Vector GetScaling()
         {
@@ -248,5 +253,11 @@ namespace Avalonia.Win32.Interop.Wpf
         }
 
         public IPopupImpl CreatePopup() => null;
+
+        public void SetTransparencyLevelHint(WindowTransparencyLevel transparencyLevel) { }
+
+        public WindowTransparencyLevel TransparencyLevel { get; private set; }
+
+        public AcrylicPlatformCompensationLevels AcrylicCompensationLevels { get; } = new AcrylicPlatformCompensationLevels(1, 1, 1);
     }
 }

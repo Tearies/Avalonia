@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -54,9 +51,7 @@ namespace Avalonia.Controls
         /// <param name="interactionHandler">The menu interaction handler.</param>
         public MenuBase(IMenuInteractionHandler interactionHandler)
         {
-            Contract.Requires<ArgumentNullException>(interactionHandler != null);
-
-            InteractionHandler = interactionHandler;
+            InteractionHandler = interactionHandler ?? throw new ArgumentNullException(nameof(interactionHandler));
         }
 
         /// <summary>
@@ -64,7 +59,7 @@ namespace Avalonia.Controls
         /// </summary>
         static MenuBase()
         {
-            MenuItem.SubmenuOpenedEvent.AddClassHandler<MenuBase>(x => x.OnSubmenuOpened);
+            MenuItem.SubmenuOpenedEvent.AddClassHandler<MenuBase>((x, e) => x.OnSubmenuOpened(e));
         }
 
         /// <summary>
@@ -80,18 +75,19 @@ namespace Avalonia.Controls
         IMenuInteractionHandler IMenu.InteractionHandler => InteractionHandler;
 
         /// <inheritdoc/>
-        IMenuItem IMenuElement.SelectedItem
+        IMenuItem? IMenuElement.SelectedItem
         {
             get
             {
                 var index = SelectedIndex;
                 return (index != -1) ?
-                    (IMenuItem)ItemContainerGenerator.ContainerFromIndex(index) :
+                    (IMenuItem?)ItemContainerGenerator.ContainerFromIndex(index) :
                     null;
             }
             set
             {
-                SelectedIndex = ItemContainerGenerator.IndexFromContainer(value);
+                SelectedIndex = value is not null ?
+                    ItemContainerGenerator.IndexFromContainer(value) : -1;
             }
         }
 
@@ -114,7 +110,7 @@ namespace Avalonia.Controls
         /// <summary>
         /// Occurs when a <see cref="Menu"/> is opened.
         /// </summary>
-        public event EventHandler<RoutedEventArgs> MenuOpened
+        public event EventHandler<RoutedEventArgs>? MenuOpened
         {
             add { AddHandler(MenuOpenedEvent, value); }
             remove { RemoveHandler(MenuOpenedEvent, value); }
@@ -123,7 +119,7 @@ namespace Avalonia.Controls
         /// <summary>
         /// Occurs when a <see cref="Menu"/> is closed.
         /// </summary>
-        public event EventHandler<RoutedEventArgs> MenuClosed
+        public event EventHandler<RoutedEventArgs>? MenuClosed
         {
             add { AddHandler(MenuClosedEvent, value); }
             remove { RemoveHandler(MenuClosedEvent, value); }

@@ -23,8 +23,9 @@ namespace Avalonia.Controls.Primitives.PopupPositioning
 
         public IReadOnlyList<ManagedPopupPositionerScreenInfo> Screens =>
 
-            _parent.Screen.AllScreens.Select(s => new ManagedPopupPositionerScreenInfo(
-                s.Bounds.ToRect(1), s.WorkingArea.ToRect(1))).ToList();
+            _parent.Screen.AllScreens
+                .Select(s => new ManagedPopupPositionerScreenInfo(s.Bounds.ToRect(1), s.WorkingArea.ToRect(1)))
+                .ToArray();
 
         public Rect ParentClientAreaScreenGeometry
         {
@@ -32,7 +33,7 @@ namespace Avalonia.Controls.Primitives.PopupPositioning
             {
                 // Popup positioner operates with abstract coordinates, but in our case they are pixel ones
                 var point = _parent.PointToScreen(default);
-                var size = PixelSize.FromSize(_parent.ClientSize, _parent.Scaling);
+                var size = _parent.ClientSize * Scaling;
                 return new Rect(point.X, point.Y, size.Width, size.Height);
 
             }
@@ -40,11 +41,9 @@ namespace Avalonia.Controls.Primitives.PopupPositioning
 
         public void MoveAndResize(Point devicePoint, Size virtualSize)
         {
-            _moveResize(new PixelPoint((int)devicePoint.X, (int)devicePoint.Y), virtualSize, _parent.Scaling);
+            _moveResize(new PixelPoint((int)devicePoint.X, (int)devicePoint.Y), virtualSize, _parent.RenderScaling);
         }
 
-        public Point TranslatePoint(Point pt) => pt * _parent.Scaling;
-
-        public Size TranslateSize(Size size) => size * _parent.Scaling;
+        public virtual double Scaling => _parent.DesktopScaling;
     }
 }

@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using Avalonia.Data;
 
@@ -14,27 +11,20 @@ namespace Avalonia
         /// <summary>
         /// Raised when a <see cref="AvaloniaProperty"/> value changes on this object.
         /// </summary>
-        event EventHandler<AvaloniaPropertyChangedEventArgs> PropertyChanged;
+        event EventHandler<AvaloniaPropertyChangedEventArgs>? PropertyChanged;
 
         /// <summary>
-        /// Raised when an inheritable <see cref="AvaloniaProperty"/> value changes on this object.
+        /// Clears an <see cref="AvaloniaProperty"/>'s local value.
         /// </summary>
-        event EventHandler<AvaloniaPropertyChangedEventArgs> InheritablePropertyChanged;
+        /// <param name="property">The property.</param>
+        void ClearValue(AvaloniaProperty property);
 
         /// <summary>
         /// Gets a <see cref="AvaloniaProperty"/> value.
         /// </summary>
         /// <param name="property">The property.</param>
         /// <returns>The value.</returns>
-        object GetValue(AvaloniaProperty property);
-
-        /// <summary>
-        /// Gets a <see cref="AvaloniaProperty"/> value.
-        /// </summary>
-        /// <typeparam name="T">The type of the property.</typeparam>
-        /// <param name="property">The property.</param>
-        /// <returns>The value.</returns>
-        T GetValue<T>(AvaloniaProperty<T> property);
+        object? GetValue(AvaloniaProperty property);
 
         /// <summary>
         /// Checks whether a <see cref="AvaloniaProperty"/> is animating.
@@ -56,21 +46,12 @@ namespace Avalonia
         /// <param name="property">The property.</param>
         /// <param name="value">The value.</param>
         /// <param name="priority">The priority of the value.</param>
-        void SetValue(
-            AvaloniaProperty property, 
-            object value, 
-            BindingPriority priority = BindingPriority.LocalValue);
-
-        /// <summary>
-        /// Sets a <see cref="AvaloniaProperty"/> value.
-        /// </summary>
-        /// <typeparam name="T">The type of the property.</typeparam>
-        /// <param name="property">The property.</param>
-        /// <param name="value">The value.</param>
-        /// <param name="priority">The priority of the value.</param>
-        void SetValue<T>(
-            AvaloniaProperty<T> property,
-            T value,
+        /// <returns>
+        /// An <see cref="IDisposable"/> if setting the property can be undone, otherwise null.
+        /// </returns>
+        IDisposable? SetValue(
+            AvaloniaProperty property,
+            object? value,
             BindingPriority priority = BindingPriority.LocalValue);
 
         /// <summary>
@@ -84,22 +65,13 @@ namespace Avalonia
         /// </returns>
         IDisposable Bind(
             AvaloniaProperty property,
-            IObservable<object> source,
+            IObservable<object?> source,
             BindingPriority priority = BindingPriority.LocalValue);
 
         /// <summary>
-        /// Binds a <see cref="AvaloniaProperty"/> to an observable.
+        /// Coerces the specified <see cref="AvaloniaProperty"/>.
         /// </summary>
-        /// <typeparam name="T">The type of the property.</typeparam>
         /// <param name="property">The property.</param>
-        /// <param name="source">The observable.</param>
-        /// <param name="priority">The priority of the binding.</param>
-        /// <returns>
-        /// A disposable which can be used to terminate the binding.
-        /// </returns>
-        IDisposable Bind<T>(
-            AvaloniaProperty<T> property,
-            IObservable<T> source,
-            BindingPriority priority = BindingPriority.LocalValue);
+        void CoerceValue(AvaloniaProperty property);
     }
 }

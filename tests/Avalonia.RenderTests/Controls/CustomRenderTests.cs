@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Threading.Tasks;
 using Avalonia.Controls;
@@ -74,6 +71,54 @@ namespace Avalonia.Direct2D1.RenderTests.Controls
                             new Rect(control.Bounds.Size),
                             4);
                     }
+                }),
+            };
+
+            await RenderToFile(target);
+            CompareImages();
+        }
+
+        [Fact]
+        public async Task GeometryClip_With_Transform()
+        {
+            var target = new Border
+            {
+                Background = Brushes.White,
+                Width = 200,
+                Height = 200,
+                Child = new CustomRenderer((control, context) =>
+                {
+                    using (var transform = context.PushPreTransform(Matrix.CreateTranslation(100, 100)))
+                    using (var clip = context.PushClip(new Rect(0, 0, 100, 100)))
+                    {
+                        context.FillRectangle(Brushes.Blue, new Rect(0, 0, 200, 200));
+                    }
+
+                    context.FillRectangle(Brushes.Red, new Rect(0, 0, 100, 100));
+                }),
+            };
+
+            await RenderToFile(target);
+            CompareImages();
+        }
+
+        [Fact]
+        public async Task Clip_With_Transform()
+        {
+            var target = new Border
+            {
+                Background = Brushes.White,
+                Width = 200,
+                Height = 200,
+                Child = new CustomRenderer((control, context) =>
+                {
+                    using (var transform = context.PushPreTransform(Matrix.CreateTranslation(100, 100)))
+                    using (var clip = context.PushClip(new Rect(0, 0, 100, 100)))
+                    {
+                        context.FillRectangle(Brushes.Blue, new Rect(0, 0, 200, 200));
+                    }
+
+                    context.FillRectangle(Brushes.Red, new Rect(0, 0, 100, 100));
                 }),
             };
 

@@ -3,12 +3,13 @@
 // Please see http://go.microsoft.com/fwlink/?LinkID=131993 for details.
 // All other rights reserved.
 
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Utilities;
 using System;
+using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
-using Avalonia.Controls;
-using Avalonia.Controls.Utils;
 
 namespace Avalonia.Controls.Primitives
 {
@@ -16,9 +17,10 @@ namespace Avalonia.Controls.Primitives
     /// Used within the template of a <see cref="T:Avalonia.Controls.DataGrid" />
     /// to specify the location in the control's visual tree where the cells are to be added. 
     /// </summary>
-    public sealed class DataGridCellsPresenter : Panel
+    public sealed class DataGridCellsPresenter : Panel, IChildIndexProvider
     {
         private double _fillerLeftEdge;
+        private EventHandler<ChildIndexChangedEventArgs> _childIndexChanged;
 
         // The desired height needs to be cached due to column virtualization; otherwise, the cells
         // would grow and shrink as the DataGrid scrolls horizontally
@@ -40,6 +42,25 @@ namespace Avalonia.Controls.Primitives
         {
             get;
             set;
+        }
+
+        event EventHandler<ChildIndexChangedEventArgs> IChildIndexProvider.ChildIndexChanged
+        {
+            add => _childIndexChanged += value;
+            remove => _childIndexChanged -= value;
+        }
+
+        int IChildIndexProvider.GetChildIndex(ILogical child)
+        {
+            return child is DataGridCell cell
+                ? OwningGrid.ColumnsInternal.GetColumnDisplayIndex(cell.ColumnIndex)
+                : throw new InvalidOperationException("Invalid cell type");
+        }
+
+        bool IChildIndexProvider.TryGetTotalCount(out int count)
+        {
+            count = OwningGrid.ColumnsInternal.VisibleColumnCount;
+            return true;
         }
 
         /// <summary>
@@ -118,6 +139,13 @@ namespace Avalonia.Controls.Primitives
             {
                 cell.Clip = null;
             }
+        }
+
+        protected override void ChildrenChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            base.ChildrenChanged(sender, e);
+
+            InvalidateChildIndex();
         }
 
         private static void EnsureCellDisplay(DataGridCell cell, bool displayColumn)
@@ -269,6 +297,9 @@ namespace Avalonia.Controls.Primitives
                 // Since we didn't know the final widths of the columns until we resized,
                 // we waited until now to measure each cell
                 double leftEdge = 0;
+                if (autoSizeHeight)
+                    DesiredHeight = 0;
+
                 foreach (DataGridColumn column in OwningGrid.ColumnsInternal.GetVisibleColumns())
                 {
                     DataGridCell cell = OwningRow.Cells[column.Index];
@@ -296,6 +327,16 @@ namespace Avalonia.Controls.Primitives
             DesiredHeight = 0;
         }
 
+        internal void InvalidateDesiredHeight()
+        {
+            DesiredHeight = 0;
+        }
+
+        internal void InvalidateChildIndex()
+        {
+            _childIndexChanged?.Invoke(this, ChildIndexChangedEventArgs.Empty);
+        }
+
         private bool ShouldDisplayCell(DataGridColumn column, double frozenLeftEdge, double scrollingLeftEdge)
         {
             if (!column.IsVisible)
@@ -307,9 +348,9 @@ namespace Avalonia.Controls.Primitives
             double leftEdge = column.IsFrozen ? frozenLeftEdge : scrollingLeftEdge;
             double rightEdge = leftEdge + column.ActualWidth;
             return 
-                DoubleUtil.GreaterThan(rightEdge, 0) &&
-                DoubleUtil.LessThanOrClose(leftEdge, OwningGrid.CellsWidth) &&
-                DoubleUtil.GreaterThan(rightEdge, frozenLeftEdge); // scrolling column covered up by frozen column(s)
+                MathUtilities.GreaterThan(rightEdge, 0) &&
+                MathUtilities.LessThanOrClose(leftEdge, OwningGrid.CellsWidth) &&
+                MathUtilities.GreaterThan(rightEdge, frozenLeftEdge); // scrolling column covered up by frozen column(s)
         }
     }
 }

@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using Avalonia.Interactivity;
 using Avalonia.Controls.Primitives;
@@ -43,7 +40,7 @@ namespace Avalonia.Controls.Mixins
         public static void Attach<TControl>(AvaloniaProperty<bool> isSelected)
             where TControl : class, IControl
         {
-            Contract.Requires<ArgumentNullException>(isSelected != null);
+            _ = isSelected ?? throw new ArgumentNullException(nameof(isSelected));
 
             isSelected.Changed.Subscribe(x =>
             {
@@ -51,7 +48,7 @@ namespace Avalonia.Controls.Mixins
 
                 if (sender != null)
                 {
-                    ((IPseudoClasses)sender.Classes).Set(":selected", (bool)x.NewValue);
+                    ((IPseudoClasses)sender.Classes).Set(":selected", x.NewValue.GetValueOrDefault());
 
                     sender.RaiseEvent(new RoutedEventArgs
                     {

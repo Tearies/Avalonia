@@ -7,7 +7,7 @@ namespace Avalonia.Controls.Primitives
     public class OverlayLayer : Canvas, ICustomSimpleHitTest
     {
         public Size AvailableSize { get; private set; }
-        public static OverlayLayer GetOverlayLayer(IVisual visual)
+        public static OverlayLayer? GetOverlayLayer(IVisual visual)
         {
             foreach(var v in visual.GetVisualAncestors())
                 if(v is VisualLayerManager vlm)
@@ -21,12 +21,16 @@ namespace Avalonia.Controls.Primitives
 
             return null;
         }
-        
-        public bool HitTest(Point point)
+
+        public bool HitTest(Point point) => Children.HitTestCustom(point);
+
+        protected override Size MeasureOverride(Size availableSize)
         {
-            return Children.Any(ctrl => ctrl.TransformedBounds?.Contains(point) == true);
+            foreach (Control child in Children)
+                child.Measure(availableSize);
+            return availableSize;
         }
-        
+
         protected override Size ArrangeOverride(Size finalSize)
         {
             // We are saving it here since child controls might need to know the entire size of the overlay

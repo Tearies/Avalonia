@@ -16,7 +16,7 @@ namespace Avalonia.Data.Core
 
         public IndexerExpressionNode(IndexExpression expression)
         {
-            _parameter = Expression.Parameter(expression.Object.Type);
+            _parameter = Expression.Parameter(expression.Object!.Type);
             _expression = expression.Update(_parameter, expression.Arguments);
 
             _getDelegate = Expression.Lambda(_expression, _parameter).Compile();
@@ -32,11 +32,13 @@ namespace Avalonia.Data.Core
 
         public override string Description => _expression.ToString();
 
-        protected override bool SetTargetValueCore(object value, BindingPriority priority)
+        protected override bool SetTargetValueCore(object? value, BindingPriority priority)
         {
             try
             {
-                _setDelegate.DynamicInvoke(Target.Target, value);
+                Target.TryGetTarget(out var target);
+
+                _setDelegate.DynamicInvoke(target, value);
                 return true;
             }
             catch (Exception)
@@ -45,7 +47,7 @@ namespace Avalonia.Data.Core
             }
         }
 
-        protected override object GetValue(object target)
+        protected override object? GetValue(object? target)
         {
             try
             {
@@ -59,11 +61,16 @@ namespace Avalonia.Data.Core
             }
         }
 
-        protected override bool ShouldUpdate(object sender, PropertyChangedEventArgs e)
+        protected override bool ShouldUpdate(object? sender, PropertyChangedEventArgs e)
         {
             return _expression.Indexer == null || _expression.Indexer.Name == e.PropertyName;
         }
 
-        protected override int? TryGetFirstArgumentAsInt() => _firstArgumentDelegate.DynamicInvoke(Target.Target) as int?;
+        protected override int? TryGetFirstArgumentAsInt()
+        {
+            Target.TryGetTarget(out var target);
+
+            return _firstArgumentDelegate.DynamicInvoke(target) as int?;
+        } 
     }
 }

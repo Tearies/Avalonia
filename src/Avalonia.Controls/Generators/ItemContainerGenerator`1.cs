@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
@@ -22,13 +19,10 @@ namespace Avalonia.Controls.Generators
         public ItemContainerGenerator(
             IControl owner, 
             AvaloniaProperty contentProperty,
-            AvaloniaProperty contentTemplateProperty)
+            AvaloniaProperty? contentTemplateProperty)
             : base(owner)
         {
-            Contract.Requires<ArgumentNullException>(owner != null);
-            Contract.Requires<ArgumentNullException>(contentProperty != null);
-
-            ContentProperty = contentProperty;
+            ContentProperty = contentProperty ?? throw new ArgumentNullException(nameof(contentProperty));
             ContentTemplateProperty = contentTemplateProperty;
         }
 
@@ -43,18 +37,14 @@ namespace Avalonia.Controls.Generators
         /// <summary>
         /// Gets the container's ContentTemplate property.
         /// </summary>
-        protected AvaloniaProperty ContentTemplateProperty { get; }
+        protected AvaloniaProperty? ContentTemplateProperty { get; }
 
         /// <inheritdoc/>
-        protected override IControl CreateContainer(object item)
+        protected override IControl? CreateContainer(object item)
         {
             var container = item as T;
 
-            if (item == null)
-            {
-                return null;
-            }
-            else if (container != null)
+            if (container != null)
             {
                 return container;
             }

@@ -3,6 +3,27 @@
         x:Class="ControlCatalog.DecoratedWindow"
         Title="Avalonia Control Gallery"
         xmlns:local="clr-namespace:ControlCatalog" HasSystemDecorations="False" Name="Window">
+        <NativeMenu.Menu>
+    <NativeMenu>
+      <NativeMenuItem Header="Decorated">
+        <NativeMenu>
+          <NativeMenuItem Header="Open"/>
+          <NativeMenuItem Header="Recent">
+            <NativeMenuItem.Menu>
+              <NativeMenu/>
+            </NativeMenuItem.Menu>
+          </NativeMenuItem>
+          <NativeMenuItem Header="Quit Avalonia" Gesture="CMD+Q"/>
+        </NativeMenu>
+      </NativeMenuItem>
+      <NativeMenuItem Header="Edit">
+        <NativeMenu>
+          <NativeMenuItem Header="Copy"/>
+          <NativeMenuItem Header="Paste"/>
+        </NativeMenu>
+      </NativeMenuItem>
+    </NativeMenu>
+  </NativeMenu.Menu>
     <Grid RowDefinitions="5,*,5" ColumnDefinitions="5,*,5">
         <DockPanel  Grid.Column="1"  Grid.Row="1" >
             <Grid Name="TitleBar" Background="LightBlue" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto">

@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using System.Reactive;
@@ -13,6 +10,7 @@ using Avalonia.UnitTests;
 using Xunit;
 using System.Threading.Tasks;
 using Avalonia.Markup.Parsers;
+using Avalonia.Threading;
 
 namespace Avalonia.Base.UnitTests.Data.Core
 {
@@ -185,6 +183,9 @@ namespace Avalonia.Base.UnitTests.Data.Core
 
             sub.Dispose();
 
+            // Forces WeakEvent compact
+            Dispatcher.UIThread.RunJobs();
+            
             Assert.Equal(0, data.PropertyChangedSubscriptionCount);
 
             GC.KeepAlive(data);
@@ -212,8 +213,11 @@ namespace Avalonia.Base.UnitTests.Data.Core
             data.RaisePropertyChanged(null);
 
             Assert.Equal(new[] { "foo", "bar", "bar" }, result);
-
+            
             sub.Dispose();
+            
+            // Forces WeakEvent compact
+            Dispatcher.UIThread.RunJobs();
 
             Assert.Equal(0, data.PropertyChangedSubscriptionCount);
 
@@ -234,7 +238,9 @@ namespace Avalonia.Base.UnitTests.Data.Core
             Assert.Equal(new[] { "bar", "baz", null }, result);
 
             sub.Dispose();
-
+            // Forces WeakEvent compact
+            Dispatcher.UIThread.RunJobs();
+            
             Assert.Equal(0, data.PropertyChangedSubscriptionCount);
             Assert.Equal(0, data.Next.PropertyChangedSubscriptionCount);
 
@@ -256,6 +262,9 @@ namespace Avalonia.Base.UnitTests.Data.Core
             Assert.Equal(new[] { "bar", "baz", null }, result);
 
             sub.Dispose();
+            
+            // Forces WeakEvent compact
+            Dispatcher.UIThread.RunJobs();
 
             Assert.Equal(0, data.PropertyChangedSubscriptionCount);
             Assert.Equal(0, data.Next.PropertyChangedSubscriptionCount);
@@ -300,6 +309,9 @@ namespace Avalonia.Base.UnitTests.Data.Core
 
             sub.Dispose();
 
+            // Forces WeakEvent compact
+            Dispatcher.UIThread.RunJobs();
+            
             Assert.Equal(0, data.PropertyChangedSubscriptionCount);
             Assert.Equal(0, data.Next.PropertyChangedSubscriptionCount);
             Assert.Equal(0, old.PropertyChangedSubscriptionCount);
@@ -325,13 +337,16 @@ namespace Avalonia.Base.UnitTests.Data.Core
                 {
                     "bar",
                     new BindingNotification(
-                        new MissingMemberException("Could not find CLR property 'Bar' on 'Avalonia.Base.UnitTests.Data.Core.ExpressionObserverTests_Property+WithoutBar'"),
+                        new MissingMemberException("Could not find a matching property accessor for 'Bar' on 'Avalonia.Base.UnitTests.Data.Core.ExpressionObserverTests_Property+WithoutBar'"),
                         BindingErrorType.Error),
                     "baz",
                 },
                 result);
 
             sub.Dispose();
+            
+            // Forces WeakEvent compact
+            Dispatcher.UIThread.RunJobs();
 
             Assert.Equal(0, data.PropertyChangedSubscriptionCount);
             Assert.Equal(0, data.Next.PropertyChangedSubscriptionCount);
@@ -415,6 +430,9 @@ namespace Avalonia.Base.UnitTests.Data.Core
             sub1.Dispose();
             sub2.Dispose();
 
+            // Forces WeakEvent compact
+            Dispatcher.UIThread.RunJobs();
+            
             Assert.Equal(0, data.PropertyChangedSubscriptionCount);
 
             GC.KeepAlive(data);
@@ -538,6 +556,8 @@ namespace Avalonia.Base.UnitTests.Data.Core
                 },
                 result);
 
+            // Forces WeakEvent compact
+            Dispatcher.UIThread.RunJobs();
             Assert.Equal(0, first.PropertyChangedSubscriptionCount);
             Assert.Equal(0, second.PropertyChangedSubscriptionCount);
 
@@ -574,12 +594,52 @@ namespace Avalonia.Base.UnitTests.Data.Core
             var source = new Class1 { Foo = "foo" };
             var target = new PropertyAccessorNode("Foo", false);
             Assert.NotNull(target);
-            target.Target = new WeakReference(source);
+            target.Target = new WeakReference<object>(source);
             target.Subscribe(_ => { });
             target.Unsubscribe();
             target.Unsubscribe();
             Assert.True(true);
         }
+
+        [Fact]
+        public void Should_Not_Throw_Exception_When_Enabling_Data_Validation_On_Missing_Member()
+        {
+            var source = new Class1();
+            var target = new PropertyAccessorNode("NotFound", true);
+
+            target.Target = new WeakReference<object>(source);
+
+            var result = new List<object>();
+
+            target.Subscribe(x => result.Add(x));
+
+            Assert.Equal(
+                new object[]
+                {
+                    new BindingNotification(
+                        new MissingMemberException("Could not find a matching property accessor for 'NotFound' on 'Avalonia.Base.UnitTests.Data.Core.ExpressionObserverTests_Property+Class1'"),
+                        BindingErrorType.Error),
+                },
+                result);
+        }
+
+        [Fact]
+        public void Should_Not_Throw_Exception_On_Duplicate_Properties()
+        {
+            // Repro of https://github.com/AvaloniaUI/Avalonia/issues/4733.
+            var source = new MyViewModel();
+            var target = new PropertyAccessorNode("Name", false);
+            
+            target.Target = new WeakReference<object>(source);
+            
+            var result = new List<object>();
+            
+            target.Subscribe(x => result.Add(x));
+        }
+        
+        public class MyViewModelBase { public object Name => "Name"; }
+        
+        public class MyViewModel : MyViewModelBase { public new string Name => "NewName"; }
 
         private interface INext
         {

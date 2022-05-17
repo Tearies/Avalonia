@@ -1,12 +1,11 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Markup.Data;
+using Avalonia.Markup.Xaml.Converters;
+using Avalonia.Markup.Xaml.XamlIl.Runtime;
+using Avalonia.Styling;
 
 namespace Avalonia.Markup.Xaml.MarkupExtensions
 {
@@ -16,42 +15,57 @@ namespace Avalonia.Markup.Xaml.MarkupExtensions
         {
         }
 
-        public StaticResourceExtension(string resourceKey)
+        public StaticResourceExtension(object resourceKey)
         {
             ResourceKey = resourceKey;
         }
 
-        public string ResourceKey { get; set; }
+        public object ResourceKey { get; set; }
 
         public object ProvideValue(IServiceProvider serviceProvider)
         {
-            // Look upwards though the ambient context for IResourceProviders which might be able
-            // to give us the resource.
-            foreach (var resourceProvider in serviceProvider.GetParents<IResourceNode>())
-            {
-                if (resourceProvider.TryGetResource(ResourceKey, out var value))
-                {
-                    return value;
-                }
+            var stack = serviceProvider.GetService<IAvaloniaXamlIlParentStackProvider>();
+            var provideTarget = serviceProvider.GetService<IProvideValueTarget>();
 
+            var targetType = provideTarget.TargetProperty switch
+            {
+                AvaloniaProperty ap => ap.PropertyType,
+                PropertyInfo pi => pi.PropertyType,
+                _ => null,
+            };
+
+            if (provideTarget.TargetObject is Setter setter)
+            {
+                targetType = setter.Property.PropertyType;
             }
 
-            // The resource still hasn't been found, so add a delayed one-time binding.
-            var provideTarget = serviceProvider.GetService<IProvideValueTarget>();
+            // Look upwards though the ambient context for IResourceNodes
+            // which might be able to give us the resource.
+            foreach (var parent in stack.Parents)
+            {
+                if (parent is IResourceNode node && node.TryGetResource(ResourceKey, out var value))
+                {
+                    return ColorToBrushConverter.Convert(value, targetType);
+                }
+            }
 
             if (provideTarget.TargetObject is IControl target &&
                 provideTarget.TargetProperty is PropertyInfo property)
             {
-                DelayedBinding.Add(target, property, GetValue);
+                // This is stored locally to avoid allocating closure in the outer scope.
+                var localTargetType = targetType;
+                var localInstance = this;
+                
+                DelayedBinding.Add(target, property, x => localInstance.GetValue(x, localTargetType));
                 return AvaloniaProperty.UnsetValue;
             }
 
             throw new KeyNotFoundException($"Static resource '{ResourceKey}' not found.");
         }
 
-        private object GetValue(IStyledElement control)
+        private object GetValue(IStyledElement control, Type targetType)
         {
-            return control.FindResource(ResourceKey);
+            return ColorToBrushConverter.Convert(control.FindResource(ResourceKey), targetType);
         }
     }
 }

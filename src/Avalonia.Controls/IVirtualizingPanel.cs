@@ -1,7 +1,4 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using Avalonia.Layout;
+﻿using Avalonia.Layout;
 
 namespace Avalonia.Controls
 {
@@ -19,7 +16,7 @@ namespace Avalonia.Controls
         /// Note that this property may remain null if the panel is added to a control that does
         /// not act as a virtualizing controller.
         /// </remarks>
-        IVirtualizingController Controller { get; set; }
+        IVirtualizingController? Controller { get; set; }
 
         /// <summary>
         /// Gets a value indicating whether the panel is full.

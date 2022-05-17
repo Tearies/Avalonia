@@ -1,6 +1,4 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
+using System;
 using System.Linq;
 using System.Reactive.Linq;
 using Xunit;
@@ -59,7 +57,7 @@ namespace Avalonia.Base.UnitTests
                 .Select(x => x.Name)
                 .ToArray();
 
-            Assert.Equal(new[] { "Attached" }, names);
+            Assert.Contains("Attached", names);
         }
 
         [Fact]
@@ -69,7 +67,7 @@ namespace Avalonia.Base.UnitTests
                 .Select(x => x.Name)
                 .ToArray();
 
-            Assert.Equal(new[] { "Attached" }, names);
+            Assert.Contains("Attached", names);
         }
 
         [Fact]

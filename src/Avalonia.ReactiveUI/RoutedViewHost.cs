@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
@@ -53,14 +50,20 @@ namespace Avalonia.ReactiveUI
     /// ReactiveUI routing documentation website</see> for more info.
     /// </para>
     /// </remarks>
-    public class RoutedViewHost : TransitioningContentControl, IActivatable, IEnableLogger
+    public class RoutedViewHost : TransitioningContentControl, IActivatableView, IEnableLogger
     {
         /// <summary>
         /// <see cref="AvaloniaProperty"/> for the <see cref="Router"/> property.
         /// </summary>
-        public static readonly AvaloniaProperty<RoutingState> RouterProperty =
-            AvaloniaProperty.Register<RoutedViewHost, RoutingState>(nameof(Router));
-    
+        public static readonly StyledProperty<RoutingState?> RouterProperty =
+            AvaloniaProperty.Register<RoutedViewHost, RoutingState?>(nameof(Router));
+
+        /// <summary>
+        /// <see cref="AvaloniaProperty"/> for the <see cref="ViewContract"/> property.
+        /// </summary>
+        public static readonly StyledProperty<string?> ViewContractProperty =
+            AvaloniaProperty.Register<RoutedViewHost, string?>(nameof(ViewContract));
+
         /// <summary>
         /// Initializes a new instance of the <see cref="RoutedViewHost"/> class.
         /// </summary>
@@ -68,53 +71,96 @@ namespace Avalonia.ReactiveUI
         {
             this.WhenActivated(disposables =>
             {
-                this.WhenAnyObservable(x => x.Router.CurrentViewModel)
-                    .DistinctUntilChanged()
-                    .Subscribe(NavigateToViewModel)
+                var routerRemoved = this
+                    .WhenAnyValue(x => x.Router)
+                    .Where(router => router == null)!
+                    .Cast<object?>();
+
+                var viewContract = this.WhenAnyValue(x => x.ViewContract);
+
+                this.WhenAnyValue(x => x.Router)
+                    .Where(router => router != null)
+                    .SelectMany(router => router!.CurrentViewModel)
+                    .Merge(routerRemoved)
+                    .CombineLatest(viewContract)
+                    .Subscribe(tuple => NavigateToViewModel(tuple.First, tuple.Second))
                     .DisposeWith(disposables);
             });
         }
-        
+
         /// <summary>
         /// Gets or sets the <see cref="RoutingState"/> of the view model stack.
         /// </summary>
-        public RoutingState Router
+        public RoutingState? Router
         {
             get => GetValue(RouterProperty);
             set => SetValue(RouterProperty, value);
         }
-        
+
+        /// <summary>
+        /// Gets or sets the view contract.
+        /// </summary>
+        public string? ViewContract
+        {
+            get => GetValue(ViewContractProperty);
+            set => SetValue(ViewContractProperty, value);
+        }
+
         /// <summary>
         /// Gets or sets the ReactiveUI view locator used by this router.
         /// </summary>
-        public IViewLocator ViewLocator { get; set; }
-    
+        public IViewLocator? ViewLocator { get; set; }
+
         /// <summary>
         /// Invoked when ReactiveUI router navigates to a view model.
         /// </summary>
         /// <param name="viewModel">ViewModel to which the user navigates.</param>
-        private void NavigateToViewModel(object viewModel)
+        /// <param name="contract">The contract for view resolution.</param>
+        private void NavigateToViewModel(object? viewModel, string? contract)
         {
+            if (Router == null)
+            {
+                this.Log().Warn("Router property is null. Falling back to default content.");
+                Content = DefaultContent;
+                return;
+            }
+
             if (viewModel == null)
             {
                 this.Log().Info("ViewModel is null. Falling back to default content.");
                 Content = DefaultContent;
                 return;
             }
-    
+
             var viewLocator = ViewLocator ?? global::ReactiveUI.ViewLocator.Current;
-            var viewInstance = viewLocator.ResolveView(viewModel);
+            var viewInstance = viewLocator.ResolveView(viewModel, contract);
             if (viewInstance == null)
             {
-                this.Log().Warn($"Couldn't find view for '{viewModel}'. Is it registered? Falling back to default content.");
+                if (contract == null)
+                {
+                    this.Log().Warn($"Couldn't find view for '{viewModel}'. Is it registered? Falling back to default content.");
+                }
+                else
+                {
+                    this.Log().Warn($"Couldn't find view with contract '{contract}' for '{viewModel}'. Is it registered? Falling back to default content.");
+                }
+
                 Content = DefaultContent;
                 return;
             }
-    
-            this.Log().Info($"Ready to show {viewInstance} with autowired {viewModel}.");
+
+            if (contract == null)
+            {
+                this.Log().Info($"Ready to show {viewInstance} with autowired {viewModel}.");
+            }
+            else
+            {
+                this.Log().Info($"Ready to show {viewInstance} with autowired {viewModel} and contract '{contract}'.");
+            }
+
             viewInstance.ViewModel = viewModel;
-            if (viewInstance is IStyledElement styled)
-                styled.DataContext = viewModel;
+            if (viewInstance is IDataContextProvider provider)
+                provider.DataContext = viewModel;
             Content = viewInstance;
         }
     }

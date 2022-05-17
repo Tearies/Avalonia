@@ -3,6 +3,7 @@
 // Please see http://go.microsoft.com/fwlink/?LinkID=131993 for details.
 // All other rights reserved.
 
+using Avalonia.Controls.Metadata;
 using Avalonia.Input;
 using System;
 
@@ -12,6 +13,7 @@ namespace Avalonia.Controls.Primitives
     /// Represents a button on a
     /// <see cref="T:Avalonia.Controls.Calendar" />.
     /// </summary>
+    [PseudoClasses(":selected", ":inactive", ":btnfocused")]
     public sealed class CalendarButton : Button
     {
         /// <summary>
@@ -43,7 +45,7 @@ namespace Avalonia.Controls.Primitives
         /// <summary>
         /// Gets or sets the Calendar associated with this button.
         /// </summary>
-        internal Calendar Owner { get; set; }
+        internal Calendar? Owner { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the button is focused.
@@ -98,9 +100,8 @@ namespace Avalonia.Controls.Primitives
         /// <see cref="T:System.Windows.Controls.Primitives.CalendarButton" />
         /// when a new template is applied.
         /// </summary>
-        protected override void OnTemplateApplied(TemplateAppliedEventArgs e)
+        protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
         {
-            base.OnTemplateApplied(e);
             SetPseudoClasses();
         }
         
@@ -119,7 +120,7 @@ namespace Avalonia.Controls.Primitives
         /// stylus touches the tablet PC) while the mouse pointer is over a
         /// UIElement.
         /// </summary>
-        public event EventHandler<PointerPressedEventArgs> CalendarLeftMouseButtonDown;
+        public event EventHandler<PointerPressedEventArgs>? CalendarLeftMouseButtonDown;
 
         /// <summary>
         /// Occurs when the left mouse button is released (or the tip of the
@@ -127,7 +128,7 @@ namespace Avalonia.Controls.Primitives
         /// stylus) is over a UIElement (or while a UIElement holds mouse
         /// capture).
         /// </summary>
-        public event EventHandler<PointerReleasedEventArgs> CalendarLeftMouseButtonUp;
+        public event EventHandler<PointerReleasedEventArgs>? CalendarLeftMouseButtonUp;
 
         /// <summary>
         /// Provides class handling for the MouseLeftButtonDown event that
@@ -149,7 +150,8 @@ namespace Avalonia.Controls.Primitives
         protected override void OnPointerPressed(PointerPressedEventArgs e)
         {
             base.OnPointerPressed(e);
-            if (e.MouseButton == MouseButton.Left)
+
+            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
                 CalendarLeftMouseButtonDown?.Invoke(this, e);
         }
 
@@ -173,7 +175,7 @@ namespace Avalonia.Controls.Primitives
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
             base.OnPointerReleased(e);
-            if (e.MouseButton == MouseButton.Left)
+            if (e.InitialPressMouseButton == MouseButton.Left)
                 CalendarLeftMouseButtonUp?.Invoke(this, e);
         }
     }

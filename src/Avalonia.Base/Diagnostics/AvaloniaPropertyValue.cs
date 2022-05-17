@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using Avalonia.Data;
 
 namespace Avalonia.Diagnostics
@@ -20,9 +17,9 @@ namespace Avalonia.Diagnostics
         /// <param name="diagnostic">A diagnostic string.</param>
         public AvaloniaPropertyValue(
             AvaloniaProperty property,
-            object value,
+            object? value,
             BindingPriority priority,
-            string diagnostic)
+            string? diagnostic)
         {
             Property = property;
             Value = value;
@@ -38,7 +35,7 @@ namespace Avalonia.Diagnostics
         /// <summary>
         /// Gets the current property value.
         /// </summary>
-        public object Value { get; }
+        public object? Value { get; }
 
         /// <summary>
         /// Gets the priority of the current value.
@@ -48,6 +45,6 @@ namespace Avalonia.Diagnostics
         /// <summary>
         /// Gets a diagnostic string.
         /// </summary>
-        public string Diagnostic { get; }
+        public string? Diagnostic { get; }
     }
 }

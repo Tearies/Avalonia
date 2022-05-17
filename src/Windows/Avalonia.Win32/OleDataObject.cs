@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,17 +8,20 @@ using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using Avalonia.Input;
+using Avalonia.MicroCom;
 using Avalonia.Win32.Interop;
+
+using IDataObject = Avalonia.Input.IDataObject;
 
 namespace Avalonia.Win32
 {
-    class OleDataObject : Avalonia.Input.IDataObject
+    internal class OleDataObject : IDataObject, IDisposable
     {
-        private IOleDataObject _wrapped;
+        private readonly Win32Com.IDataObject _wrapped;
 
-        public OleDataObject(IOleDataObject wrapped)
+        public OleDataObject(Win32Com.IDataObject wrapped)
         {
-            _wrapped = wrapped;
+            _wrapped = wrapped.CloneReference();
         }
 
         public bool Contains(string dataFormat)
@@ -32,12 +36,12 @@ namespace Avalonia.Win32
 
         public string GetText()
         {
-            return GetDataFromOleHGLOBAL(DataFormats.Text, DVASPECT.DVASPECT_CONTENT) as string;
+            return (string)GetDataFromOleHGLOBAL(DataFormats.Text, DVASPECT.DVASPECT_CONTENT);
         }
 
         public IEnumerable<string> GetFileNames()
         {
-            return GetDataFromOleHGLOBAL(DataFormats.FileNames, DVASPECT.DVASPECT_CONTENT) as IEnumerable<string>;
+            return (IEnumerable<string>)GetDataFromOleHGLOBAL(DataFormats.FileNames, DVASPECT.DVASPECT_CONTENT);
         }
 
         public object Get(string dataFormat)
@@ -45,16 +49,17 @@ namespace Avalonia.Win32
             return GetDataFromOleHGLOBAL(dataFormat, DVASPECT.DVASPECT_CONTENT);
         }
 
-        private object GetDataFromOleHGLOBAL(string format, DVASPECT aspect)
+        private unsafe object GetDataFromOleHGLOBAL(string format, DVASPECT aspect)
         {
-            FORMATETC formatEtc = new FORMATETC();
+            var formatEtc = new Interop.FORMATETC();
             formatEtc.cfFormat = ClipboardFormats.GetFormat(format);
             formatEtc.dwAspect = aspect;
             formatEtc.lindex = -1;
             formatEtc.tymed = TYMED.TYMED_HGLOBAL;
-            if (_wrapped.QueryGetData(ref formatEtc) == 0)
+            if (_wrapped.QueryGetData(&formatEtc) == 0)
             {
-                _wrapped.GetData(ref formatEtc, out STGMEDIUM medium);
+                Interop.STGMEDIUM medium = default;
+                _ = _wrapped.GetData(&formatEtc, &medium);
                 try
                 {
                     if (medium.unionmember != IntPtr.Zero && medium.tymed == TYMED.TYMED_HGLOBAL)
@@ -86,15 +91,8 @@ namespace Avalonia.Win32
             return null;
         }
 
-        private bool IsSerializedObject(byte[] data)
-        {
-            if (data.Length < DataObject.SerializedObjectGUID.Length)
-                return false;
-            for (int i = 0; i < DataObject.SerializedObjectGUID.Length; i++)
-                if (data[i] != DataObject.SerializedObjectGUID[i])
-                    return false;
-            return true;
-        }
+        private static bool IsSerializedObject(ReadOnlySpan<byte> data) =>
+            data.StartsWith(DataObject.SerializedObjectGUID);
 
         private static IEnumerable<string> ReadFileNamesFromHGlobal(IntPtr hGlobal)
         {
@@ -145,26 +143,53 @@ namespace Avalonia.Win32
             }
         }
 
-        private IEnumerable<string> GetDataFormatsCore()
+        private unsafe IEnumerable<string> GetDataFormatsCore()
         {
-            var enumFormat = _wrapped.EnumFormatEtc(DATADIR.DATADIR_GET);
+            var formatsList = new List<string>();
+            var enumFormat = _wrapped.EnumFormatEtc((int)DATADIR.DATADIR_GET);
+
             if (enumFormat != null)
             {
                 enumFormat.Reset();
-                FORMATETC[] formats = new FORMATETC[1];
-                int[] fetched = { 1 };
-                while (fetched[0] > 0)
+                
+                var formats = ArrayPool<Interop.FORMATETC>.Shared.Rent(1);
+
+                try
                 {
-                    fetched[0] = 0;
-                    if (enumFormat.Next(1, formats, fetched) == 0 && fetched[0] > 0)
+                    uint fetched = 0;
+                    do
                     {
-                        if (formats[0].ptd != IntPtr.Zero)
-                            Marshal.FreeCoTaskMem(formats[0].ptd);
-                        
-                        yield return ClipboardFormats.GetFormat(formats[0].cfFormat);
+                        fixed (Interop.FORMATETC* formatsPtr = formats)
+                        {
+                            // Read one item at a time.
+                            // When "celt" parameter is 1, "pceltFetched" is ignored.
+                            var res = enumFormat.Next(1, formatsPtr, &fetched);
+                            if (res != 0)
+                            {
+                                break;
+                            }
+                        }
+                        if (fetched > 0)
+                        {
+                            if (formats[0].ptd != IntPtr.Zero)
+                                Marshal.FreeCoTaskMem(formats[0].ptd);
+
+                            formatsList.Add(ClipboardFormats.GetFormat(formats[0].cfFormat));
+                        }
                     }
+                    while (fetched > 0);
+                }
+                finally
+                {
+                    ArrayPool<Interop.FORMATETC>.Shared.Return(formats);
                 }
             }
+            return formatsList;
+        }
+
+        public void Dispose()
+        {
+            _wrapped.Dispose();
         }
     }
 }

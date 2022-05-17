@@ -1,28 +1,52 @@
 jobs:
+
+- job: GetPRNumber
+  pool:
+    vmImage: 'windows-2022'
+  variables:
+    SolutionDir: '$(Build.SourcesDirectory)'
+  steps:
+    
+  - task: PowerShell@2
+    displayName: Get PR Number
+    inputs:
+      targetType: 'inline'
+      script: |
+        $prId = $env:System_PullRequest_PullRequestNumber
+        Write-Host "PR Number  is:-" $env:System_PullRequest_PullRequestNumber
+
+        if (!([string]::IsNullOrWhiteSpace($prId)))
+        {
+          Set-Content -Path $env:Build_ArtifactStagingDirectory\prId.txt -Value $prId
+        }
+      
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: 'PRNumber'
+      publishLocation: 'Container'
+      
 - job: Linux
   pool:
-    vmImage: 'ubuntu-16.04'
+    vmImage: 'ubuntu-20.04'
   steps:
-  - task: CmdLine@2
-    displayName: 'Install CastXML'
+  - task: UseDotNet@2
+    displayName: 'Use .NET Core SDK 3.1.418'
     inputs:
-      script: |
-        sudo apt-get update
-        sudo apt-get install castxml
+      version: 3.1.418
+
+  - task: UseDotNet@2
+    displayName: 'Use .NET Core SDK 6.0.202'
+    inputs:
+      version: 6.0.202
 
   - task: CmdLine@2
-    displayName: 'Install Nuke'
+    displayName: 'Run Build'
     inputs:
       script: |
-         dotnet tool install --global Nuke.GlobalTool --version 0.12.3
-  - task: CmdLine@2
-    displayName: 'Run Nuke'
-    inputs:
-      script: |
-        export PATH="$PATH:$HOME/.dotnet/tools"
         dotnet --info
         printenv
-        nuke --target CiAzureLinux --configuration=Release
+        ./build.sh --target CiAzureLinux --configuration=Release
 
   - task: PublishTestResults@2
     inputs:
@@ -30,14 +54,23 @@ jobs:
       testResultsFiles: '$(Build.SourcesDirectory)/artifacts/test-results/*.trx'
     condition: not(canceled())
      
-- job: macOS
-  pool:
-    vmImage: 'macOS-10.14'
-  steps:
-  - task: DotNetCoreInstaller@0
-    inputs:
-      version: '2.1.403'
 
+- job: macOS
+  variables:
+    SolutionDir: '$(Build.SourcesDirectory)'
+  pool:
+    vmImage: 'macOS-10.15'
+  steps:
+  - task: UseDotNet@2
+    displayName: 'Use .NET Core SDK 3.1.418'
+    inputs:
+      version: 3.1.418
+
+  - task: UseDotNet@2
+    displayName: 'Use .NET Core SDK 6.0.202'
+    inputs:
+      version: 6.0.202
+      
   - task: CmdLine@2
     displayName: 'Install Mono 5.18'
     inputs:
@@ -45,31 +78,27 @@ jobs:
         curl -o ./mono.pkg https://download.mono-project.com/archive/5.18.0/macos-10-universal/MonoFramework-MDK-5.18.0.225.macos10.xamarin.universal.pkg 
         sudo installer -verbose -pkg ./mono.pkg -target /
 
+  - task: CmdLine@2
+    displayName: 'Generate avalonia-native'
+    inputs:
+      script: |
+        export COREHOST_TRACE=0
+        export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+        export DOTNET_CLI_TELEMETRY_OPTOUT=1
+        ./build.sh --target GenerateCppHeaders --configuration Release 
+
   - task: Xcode@5
     inputs:
       actions: 'build'
       scheme: ''
-      sdk: 'macosx10.14'
+      sdk: 'macosx11.1'
       configuration: 'Release'
       xcWorkspacePath: '**/*.xcodeproj/project.xcworkspace'
-      xcodeVersion: 'default' # Options: 8, 9, default, specifyPath
+      xcodeVersion: '12' # Options: 8, 9, default, specifyPath
       args: '-derivedDataPath ./'
 
   - task: CmdLine@2
-    displayName: 'Install CastXML'
-    inputs:
-      script: |
-        brew update
-        brew install castxml
-
-  - task: CmdLine@2
-    displayName: 'Install Nuke'
-    inputs:
-      script: |
-       dotnet tool install --global Nuke.GlobalTool --version 0.12.3 
-
-  - task: CmdLine@2
-    displayName: 'Run Nuke'
+    displayName: 'Run Build'
     inputs:
       script: |
         export COREHOST_TRACE=0
@@ -77,10 +106,8 @@ jobs:
         export DOTNET_CLI_TELEMETRY_OPTOUT=1
         which dotnet
         dotnet --info
-        export PATH="$PATH:$HOME/.dotnet/tools"
-        dotnet --info
         printenv
-        nuke --target CiAzureOSX --configuration Release
+        ./build.sh --target CiAzureOSX --configuration Release --skip-previewer
 
   - task: PublishTestResults@2
     inputs:
@@ -102,13 +129,31 @@ jobs:
 
 - job: Windows
   pool:
-    vmImage: 'windows-2019'
+    vmImage: 'windows-2022'
+  variables:
+    SolutionDir: '$(Build.SourcesDirectory)'
   steps:
+  - task: UseDotNet@2
+    displayName: 'Use .NET Core SDK 3.1.418'
+    inputs:
+      version: 3.1.418
+
+  - task: UseDotNet@2
+    displayName: 'Use .NET Core SDK 6.0.202'
+    inputs:
+      version: 6.0.202
+
+  - task: CmdLine@2
+    displayName: 'Install Workloads'
+    inputs:
+      script: |
+       dotnet workload install android ios
+
   - task: CmdLine@2
     displayName: 'Install Nuke'
     inputs:
       script: |
-       dotnet tool install --global Nuke.GlobalTool --version 0.12.3 
+       dotnet tool install --global Nuke.GlobalTool --version 0.24.0 
 
   - task: CmdLine@2
     displayName: 'Run Nuke'

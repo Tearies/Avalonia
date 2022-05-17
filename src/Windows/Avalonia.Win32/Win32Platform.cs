@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -9,14 +6,16 @@ using System.IO;
 using System.Reactive.Disposables;
 using System.Runtime.InteropServices;
 using System.Threading;
-using Avalonia.Animation;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Platform;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
+using Avalonia.OpenGL;
 using Avalonia.Platform;
 using Avalonia.Rendering;
 using Avalonia.Threading;
+using Avalonia.Utilities;
 using Avalonia.Win32.Input;
 using Avalonia.Win32.Interop;
 using static Avalonia.Win32.Interop.UnmanagedMethods;
@@ -36,18 +35,78 @@ namespace Avalonia
         }
     }
 
+    /// <summary>
+    /// Platform-specific options which apply to Windows.
+    /// </summary>
     public class Win32PlatformOptions
     {
+        /// <summary>
+        /// Deferred renderer would be used when set to true. Immediate renderer when set to false. The default value is true.
+        /// </summary>
+        /// <remarks>
+        /// Avalonia has two rendering modes: Immediate and Deferred rendering.
+        /// Immediate re-renders the whole scene when some element is changed on the scene. Deferred re-renders only changed elements.
+        /// </remarks>
         public bool UseDeferredRendering { get; set; } = true;
-        public bool AllowEglInitialization { get; set; }
-        public bool? EnableMultitouch { get; set; }
+
+        /// <summary>
+        /// Enables ANGLE for Windows. For every Windows version that is above Windows 7, the default is true otherwise it's false.
+        /// </summary>
+        /// <remarks>
+        /// GPU rendering will not be enabled if this is set to false.
+        /// </remarks>
+        public bool? AllowEglInitialization { get; set; }
+        
+        public IList<string> EglRendererBlacklist { get; set; } = new List<string>
+        {
+            "Microsoft Basic Render"
+        };
+
+        /// <summary>
+        /// Enables multitouch support. The default value is true.
+        /// </summary>
+        /// <remarks>
+        /// Multitouch allows a surface (a touchpad or touchscreen) to recognize the presence of more than one point of contact with the surface at the same time.
+        /// </remarks>
+        public bool? EnableMultitouch { get; set; } = true;
+
+        /// <summary>
+        /// Embeds popups to the window when set to true. The default value is false.
+        /// </summary>
         public bool OverlayPopups { get; set; }
+
+        /// <summary>
+        /// Avalonia would try to use native Widows OpenGL when set to true. The default value is false.
+        /// </summary>
+        public bool UseWgl { get; set; }
+
+        public IList<GlVersion> WglProfiles { get; set; } = new List<GlVersion>
+        {
+            new GlVersion(GlProfileType.OpenGL, 4, 0),
+            new GlVersion(GlProfileType.OpenGL, 3, 2),
+        };
+
+        /// <summary>
+        /// Render Avalonia to a Texture inside the Windows.UI.Composition tree.
+        /// </summary>
+        /// <remarks>
+        /// Supported on Windows 10 build 16299 and above. Ignored on other versions.
+        /// This is recommended if you need to use AcrylicBlur or acrylic in your applications.
+        /// </remarks>
+        public bool UseWindowsUIComposition { get; set; } = true;
+
+        /// <summary>
+        /// When <see cref="UseWindowsUIComposition"/> enabled, create rounded corner blur brushes
+        /// If set to null the brushes will be created using default settings (sharp corners)
+        /// This can be useful when you need a rounded-corner blurred Windows 10 app, or borderless Windows 11 app
+        /// </summary>
+        public float? CompositionBackdropCornerRadius { get; set; }
     }
 }
 
 namespace Avalonia.Win32
 {
-    class Win32Platform : IPlatformThreadingInterface, IPlatformSettings, IWindowingPlatform, IPlatformIconLoader
+    public class Win32Platform : IPlatformThreadingInterface, IPlatformSettings, IWindowingPlatform, IPlatformIconLoader, IPlatformLifetimeEventsImpl
     {
         private static readonly Win32Platform s_instance = new Win32Platform();
         private static Thread _uiThread;
@@ -61,6 +120,15 @@ namespace Avalonia.Win32
             CreateMessageWindow();
         }
 
+        internal static Win32Platform Instance => s_instance;
+
+        internal IntPtr Handle => _hwnd;
+
+        /// <summary>
+        /// Gets the actual WindowsVersion. Same as the info returned from RtlGetVersion.
+        /// </summary>
+        public static Version WindowsVersion { get; } = RtlGetVersion();
+
         public static bool UseDeferredRendering => Options.UseDeferredRendering;
         internal static bool UseOverlayPopups => Options.OverlayPopups;
         public static Win32PlatformOptions Options { get; private set; }
@@ -71,6 +139,11 @@ namespace Avalonia.Win32
 
         public TimeSpan DoubleClickTime => TimeSpan.FromMilliseconds(UnmanagedMethods.GetDoubleClickTime());
 
+        /// <inheritdoc cref="IPlatformSettings.TouchDoubleClickSize"/>
+        public Size TouchDoubleClickSize => new Size(16,16);
+
+        /// <inheritdoc cref="IPlatformSettings.TouchDoubleClickTime"/>
+        public TimeSpan TouchDoubleClickTime => DoubleClickTime;
         public static void Initialize()
         {
             Initialize(new Win32PlatformOptions());
@@ -81,7 +154,7 @@ namespace Avalonia.Win32
             Options = options;
             AvaloniaLocator.CurrentMutable
                 .Bind<IClipboard>().ToSingleton<ClipboardImpl>()
-                .Bind<IStandardCursorFactory>().ToConstant(CursorFactory.Instance)
+                .Bind<ICursorFactory>().ToConstant(CursorFactory.Instance)
                 .Bind<IKeyboardDevice>().ToConstant(WindowsKeyboardDevice.Instance)
                 .Bind<IPlatformSettings>().ToConstant(s_instance)
                 .Bind<IPlatformThreadingInterface>().ToConstant(s_instance)
@@ -89,11 +162,21 @@ namespace Avalonia.Win32
                 .Bind<IRenderTimer>().ToConstant(new DefaultRenderTimer(60))
                 .Bind<ISystemDialogImpl>().ToSingleton<SystemDialogImpl>()
                 .Bind<IWindowingPlatform>().ToConstant(s_instance)
-                .Bind<PlatformHotkeyConfiguration>().ToSingleton<PlatformHotkeyConfiguration>()
-                .Bind<IPlatformIconLoader>().ToConstant(s_instance);
-            if (options.AllowEglInitialization)
-                Win32GlManager.Initialize();
-            
+                .Bind<PlatformHotkeyConfiguration>().ToConstant(new PlatformHotkeyConfiguration(KeyModifiers.Control)
+                {
+                    OpenContextMenu =
+                    {
+                        // Add Shift+F10
+                        new KeyGesture(Key.F10, KeyModifiers.Shift)
+                    }
+                })
+                .Bind<IPlatformIconLoader>().ToConstant(s_instance)
+                .Bind<NonPumpingLockHelper.IHelperImpl>().ToConstant(new NonPumpingSyncContext.HelperImpl())
+                .Bind<IMountedVolumeInfoProvider>().ToConstant(new WindowsMountedVolumeInfoProvider())
+                .Bind<IPlatformLifetimeEventsImpl>().ToConstant(s_instance);
+
+            Win32GlManager.Initialize();
+
             _uiThread = Thread.CurrentThread;
 
             if (OleContext.Current != null)
@@ -108,20 +191,33 @@ namespace Avalonia.Win32
 
         public void ProcessMessage()
         {
-            UnmanagedMethods.MSG msg;
-            UnmanagedMethods.GetMessage(out msg, IntPtr.Zero, 0, 0);
-            UnmanagedMethods.TranslateMessage(ref msg);
-            UnmanagedMethods.DispatchMessage(ref msg);
+
+            if (UnmanagedMethods.GetMessage(out var msg, IntPtr.Zero, 0, 0) > -1)
+            {
+                UnmanagedMethods.TranslateMessage(ref msg);
+                UnmanagedMethods.DispatchMessage(ref msg);
+            }
+            else
+            {
+                Logging.Logger.TryGet(Logging.LogEventLevel.Error, Logging.LogArea.Win32Platform)
+                    ?.Log(this, "Unmanaged error in {0}. Error Code: {1}", nameof(ProcessMessage), Marshal.GetLastWin32Error());
+
+            }
         }
 
         public void RunLoop(CancellationToken cancellationToken)
         {
-            while (!cancellationToken.IsCancellationRequested)
+            var result = 0;
+            while (!cancellationToken.IsCancellationRequested 
+                && (result = UnmanagedMethods.GetMessage(out var msg, IntPtr.Zero, 0, 0)) > 0)
             {
-                UnmanagedMethods.MSG msg;
-                UnmanagedMethods.GetMessage(out msg, IntPtr.Zero, 0, 0);
                 UnmanagedMethods.TranslateMessage(ref msg);
                 UnmanagedMethods.DispatchMessage(ref msg);
+            }
+            if (result < 0)
+            {
+                Logging.Logger.TryGet(Logging.LogEventLevel.Error, Logging.LogArea.Win32Platform)
+                    ?.Log(this, "Unmanaged error in {0}. Error Code: {1}", nameof(RunLoop), Marshal.GetLastWin32Error());
             }
         }
 
@@ -162,6 +258,8 @@ namespace Avalonia.Win32
 
         public event Action<DispatcherPriority?> Signaled;
 
+        public event EventHandler<ShutdownRequestedEventArgs> ShutdownRequested;
+
         [SuppressMessage("Microsoft.StyleCop.CSharp.NamingRules", "SA1305:FieldNamesMustNotUseHungarianNotation", Justification = "Using Win32 naming for consistency.")]
         private IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
         {
@@ -169,6 +267,24 @@ namespace Avalonia.Win32
             {
                 Signaled?.Invoke(null);
             }
+
+            if(msg == (uint)WindowsMessage.WM_QUERYENDSESSION)
+            {
+                if (ShutdownRequested != null)
+                {
+                    var e = new ShutdownRequestedEventArgs();
+
+                    ShutdownRequested(this, e);
+
+                    if(e.Cancel)
+                    {
+                        return IntPtr.Zero;
+                    }
+                }
+            }
+            
+            TrayIconImpl.ProcWnd(hWnd, msg, wParam, lParam);
+
             return UnmanagedMethods.DefWindowProc(hWnd, msg, wParam, lParam);
         }
 
@@ -200,15 +316,20 @@ namespace Avalonia.Win32
             }
         }
 
+        public ITrayIconImpl CreateTrayIcon ()
+        {
+            return new TrayIconImpl();
+        }
+
         public IWindowImpl CreateWindow()
         {
             return new WindowImpl();
         }
 
-        public IEmbeddableWindowImpl CreateEmbeddableWindow()
+        public IWindowImpl CreateEmbeddableWindow()
         {
             var embedded = new EmbeddedWindowImpl();
-            embedded.Show();
+            embedded.Show(true, false);
             return embedded;
         }
 

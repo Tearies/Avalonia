@@ -1,19 +1,18 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System.IO;
 using System.Runtime.CompilerServices;
-using ImageMagick;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Rendering;
-
+using SixLabors.ImageSharp;
 using Xunit;
 using Avalonia.Platform;
 using System.Threading.Tasks;
 using System;
 using System.Threading;
+using Avalonia.Media;
 using Avalonia.Threading;
+using SixLabors.ImageSharp.PixelFormats;
+using Image = SixLabors.ImageSharp.Image;
 #if AVALONIA_SKIA
 using Avalonia.Skia;
 #else
@@ -26,10 +25,21 @@ namespace Avalonia.Skia.RenderTests
 namespace Avalonia.Direct2D1.RenderTests
 #endif
 {
+    using Avalonia.PlatformSupport;
+
     public class TestBase
     {
+#if AVALONIA_SKIA
+        private static string s_fontUri = "resm:Avalonia.Skia.RenderTests.Assets?assembly=Avalonia.Skia.RenderTests#Noto Mono";
+#else
+        private static string s_fontUri = "resm:Avalonia.Direct2D1.RenderTests.Assets?assembly=Avalonia.Direct2D1.RenderTests#Noto Mono";
+#endif
+        public static FontFamily TestFontFamily = new FontFamily(s_fontUri);
+
         private static readonly TestThreadingInterface threadingInterface =
             new TestThreadingInterface();
+
+        private static readonly IAssetLoader assetLoader = new AssetLoader();
 
         static TestBase()
         {
@@ -42,6 +52,9 @@ namespace Avalonia.Direct2D1.RenderTests
                 .Bind<IPlatformThreadingInterface>()
                 .ToConstant(threadingInterface);
 
+            AvaloniaLocator.CurrentMutable
+                .Bind<IAssetLoader>()
+                .ToConstant(assetLoader);
         }
 
         public TestBase(string outputPath)
@@ -107,12 +120,12 @@ namespace Avalonia.Direct2D1.RenderTests
             var immediatePath = Path.Combine(OutputPath, testName + ".immediate.out.png");
             var deferredPath = Path.Combine(OutputPath, testName + ".deferred.out.png");
 
-            using (var expected = new MagickImage(expectedPath))
-            using (var immediate = new MagickImage(immediatePath))
-            using (var deferred = new MagickImage(deferredPath))
+            using (var expected = Image.Load<Rgba32>(expectedPath))
+            using (var immediate = Image.Load<Rgba32>(immediatePath))
+            using (var deferred = Image.Load<Rgba32>(deferredPath))
             {
-                double immediateError = expected.Compare(immediate, ErrorMetric.RootMeanSquared);
-                double deferredError = expected.Compare(deferred, ErrorMetric.RootMeanSquared);
+                var immediateError = CompareImages(immediate, expected);
+                var deferredError = CompareImages(deferred, expected);
 
                 if (immediateError > 0.022)
                 {
@@ -131,16 +144,63 @@ namespace Avalonia.Direct2D1.RenderTests
             var expectedPath = Path.Combine(OutputPath, testName + ".expected.png");
             var actualPath = Path.Combine(OutputPath, testName + ".out.png");
 
-            using (var expected = new MagickImage(expectedPath))
-            using (var actual = new MagickImage(actualPath))
+            using (var expected = Image.Load<Rgba32>(expectedPath))
+            using (var actual = Image.Load<Rgba32>(actualPath))
             {
-                double immediateError = expected.Compare(actual, ErrorMetric.RootMeanSquared);
+                double immediateError = CompareImages(actual, expected);
 
                 if (immediateError > 0.022)
                 {
                     Assert.True(false, actualPath + ": Error = " + immediateError);
                 }
             }
+        }
+        
+        /// <summary>
+        /// Calculates root mean square error for given two images.
+        /// Based roughly on ImageMagick implementation to ensure consistency.
+        /// </summary>
+        private static double CompareImages(Image<Rgba32> actual, Image<Rgba32> expected)
+        {
+            if (actual.Width != expected.Width || actual.Height != expected.Height)
+            {
+                throw new ArgumentException("Images have different resolutions");
+            }
+
+            var quantity = actual.Width * actual.Height;
+            double squaresError = 0;
+
+            const double scale = 1 / 255d;
+            
+            for (var x = 0; x < actual.Width; x++)
+            {
+                double localError = 0;
+                
+                for (var y = 0; y < actual.Height; y++)
+                {
+                    var expectedAlpha = expected[x, y].A * scale;
+                    var actualAlpha = actual[x, y].A * scale;
+                    
+                    var r = scale * (expectedAlpha * expected[x, y].R - actualAlpha * actual[x, y].R);
+                    var g = scale * (expectedAlpha * expected[x, y].G - actualAlpha * actual[x, y].G);
+                    var b = scale * (expectedAlpha * expected[x, y].B - actualAlpha * actual[x, y].B);
+                    var a = expectedAlpha - actualAlpha;
+
+                    var error = r * r + g * g + b * b + a * a;
+
+                    localError += error;
+                }
+
+                squaresError += localError;
+            }
+
+            var meanSquaresError = squaresError / quantity;
+
+            const int channelCount = 4;
+            
+            meanSquaresError = meanSquaresError / channelCount;
+            
+            return Math.Sqrt(meanSquaresError);
         }
 
         private string GetTestsDirectory()
@@ -172,7 +232,7 @@ namespace Avalonia.Direct2D1.RenderTests
 
             public void Signal(DispatcherPriority prio)
             {
-                throw new NotImplementedException();
+                // No-op
             }
 
             public IDisposable StartTimer(DispatcherPriority priority, TimeSpan interval, Action tick)

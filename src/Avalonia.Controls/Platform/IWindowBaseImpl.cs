@@ -1,19 +1,26 @@
 using System;
-using Avalonia.Controls;
+using Avalonia.Automation.Peers;
 
 namespace Avalonia.Platform
 {
     public interface IWindowBaseImpl : ITopLevelImpl
     {
         /// <summary>
-        /// Shows the top level.
+        /// Shows the window.
         /// </summary>
-        void Show();
+        /// <param name="activate">Whether to activate the shown window.</param>
+        /// <param name="isDialog">Whether the window is being shown as a dialog.</param>
+        void Show(bool activate, bool isDialog);
 
         /// <summary>
         /// Hides the window.
         /// </summary>
         void Hide();
+        
+        /// <summary>
+        /// Gets the scaling factor for Window positioning and sizing.
+        /// </summary>
+        double DesktopScaling { get; }
 
         /// <summary>
         /// Gets the position of the window in device pixels.
@@ -23,7 +30,7 @@ namespace Avalonia.Platform
         /// <summary>
         /// Gets or sets a method called when the window's position changes.
         /// </summary>
-        Action<PixelPoint> PositionChanged { get; set; }
+        Action<PixelPoint>? PositionChanged { get; set; }
 
         /// <summary>
         /// Activates the window.
@@ -33,12 +40,12 @@ namespace Avalonia.Platform
         /// <summary>
         /// Gets or sets a method called when the window is deactivated (loses focus).
         /// </summary>
-        Action Deactivated { get; set; }
+        Action? Deactivated { get; set; }
 
         /// <summary>
         /// Gets or sets a method called when the window is activated (receives focus).
         /// </summary>
-        Action Activated { get; set; }
+        Action? Activated { get; set; }
 
         /// <summary>
         /// Gets the platform window handle.
@@ -46,9 +53,9 @@ namespace Avalonia.Platform
         IPlatformHandle Handle { get; }
        
         /// <summary>
-        /// Gets the maximum size of a window on the system.
+        /// Gets a maximum client size hint for an auto-sizing window, in device-independent pixels.
         /// </summary>
-        Size MaxClientSize { get; }
+        Size MaxAutoSizeHint { get; }
 
         /// <summary>
         /// Sets whether this window appears on top of all other windows

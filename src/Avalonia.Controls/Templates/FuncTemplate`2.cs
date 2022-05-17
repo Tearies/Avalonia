@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 
 namespace Avalonia.Controls.Templates
@@ -11,7 +8,7 @@ namespace Avalonia.Controls.Templates
     /// <typeparam name="TParam">The type of the parameter.</typeparam>
     /// <typeparam name="TControl">The type of control.</typeparam>
     public class FuncTemplate<TParam, TControl> : ITemplate<TParam, TControl>
-        where TControl : IControl
+        where TControl : IControl?
     {
         private readonly Func<TParam, INameScope, TControl> _func;
 
@@ -21,9 +18,7 @@ namespace Avalonia.Controls.Templates
         /// <param name="func">The function used to create the control.</param>
         public FuncTemplate(Func<TParam, INameScope, TControl> func)
         {
-            Contract.Requires<ArgumentNullException>(func != null);
-
-            _func = func;
+            _func = func ?? throw new ArgumentNullException(nameof(func));
         }
 
         /// <summary>

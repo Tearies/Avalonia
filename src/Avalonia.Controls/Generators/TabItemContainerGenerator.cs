@@ -1,7 +1,10 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
+using System;
+using System.Collections.Generic;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
+using Avalonia.LogicalTree;
+using Avalonia.Reactive;
+using Avalonia.VisualTree;
 
 namespace Avalonia.Controls.Generators
 {    
@@ -17,15 +20,17 @@ namespace Avalonia.Controls.Generators
 
         protected override IControl CreateContainer(object item)
         {
-            var tabItem = (TabItem)base.CreateContainer(item);
+            var tabItem = (TabItem)base.CreateContainer(item)!;
 
-            tabItem.ParentTabControl = Owner;
-
-            tabItem[~TabControl.TabStripPlacementProperty] = Owner[~TabControl.TabStripPlacementProperty];
+            tabItem.Bind(TabItem.TabStripPlacementProperty, new OwnerBinding<Dock>(
+                tabItem,
+                TabControl.TabStripPlacementProperty));
 
             if (tabItem.HeaderTemplate == null)
             {
-                tabItem[~HeaderedContentControl.HeaderTemplateProperty] = Owner[~ItemsControl.ItemTemplateProperty];
+                tabItem.Bind(TabItem.HeaderTemplateProperty, new OwnerBinding<IDataTemplate?>(
+                    tabItem,
+                    TabControl.ItemTemplateProperty));
             }
 
             if (tabItem.Header == null)
@@ -45,15 +50,49 @@ namespace Avalonia.Controls.Generators
 
             if (!(tabItem.Content is IControl))
             {
-                tabItem[~ContentControl.ContentTemplateProperty] = Owner[~TabControl.ContentTemplateProperty];
-            }
-
-            if (tabItem.Content == null)
-            {
-                tabItem[~ContentControl.ContentProperty] = tabItem[~StyledElement.DataContextProperty];
+                tabItem.Bind(TabItem.ContentTemplateProperty, new OwnerBinding<IDataTemplate?>(
+                    tabItem,
+                    TabControl.ContentTemplateProperty));
             }
 
             return tabItem;
+        }
+
+        private class OwnerBinding<T> : SingleSubscriberObservableBase<T>
+        {
+            private readonly TabItem _item;
+            private readonly StyledProperty<T> _ownerProperty;
+            private IDisposable? _ownerSubscription;
+            private IDisposable? _propertySubscription;
+
+            public OwnerBinding(TabItem item, StyledProperty<T> ownerProperty)
+            {
+                _item = item;
+                _ownerProperty = ownerProperty;
+            }
+
+            protected override void Subscribed()
+            {
+                _ownerSubscription = ControlLocator.Track(_item, 0, typeof(TabControl)).Subscribe(OwnerChanged);
+            }
+
+            protected override void Unsubscribed()
+            {
+                _ownerSubscription?.Dispose();
+                _ownerSubscription = null;
+            }
+
+            private void OwnerChanged(ILogical? c)
+            {
+                _propertySubscription?.Dispose();
+                _propertySubscription = null;
+
+                if (c is TabControl tabControl)
+                {
+                    _propertySubscription = tabControl.GetObservable(_ownerProperty)
+                        .Subscribe(x => PublishNext(x));
+                }
+            }
         }
     }
 }

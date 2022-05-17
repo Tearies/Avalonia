@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-//
 // Idea got from and adapted to work in avalonia
 // http://silverlight.codeplex.com/SourceControl/changeset/view/74775#Release/Silverlight4/Source/Controls.Layout.Toolkit/LayoutTransformer/LayoutTransformer.cs
 //
@@ -17,28 +14,30 @@ namespace Avalonia.Controls
     /// </summary>
     public class LayoutTransformControl : Decorator
     {
-        public static readonly AvaloniaProperty<Transform> LayoutTransformProperty =
-            AvaloniaProperty.Register<LayoutTransformControl, Transform>(nameof(LayoutTransform));
+        public static readonly StyledProperty<ITransform?> LayoutTransformProperty =
+            AvaloniaProperty.Register<LayoutTransformControl, ITransform?>(nameof(LayoutTransform));
 
-        public static readonly AvaloniaProperty<bool> UseRenderTransformProperty =
-            AvaloniaProperty.Register<LayoutTransformControl, bool>(nameof(LayoutTransform));
+        public static readonly StyledProperty<bool> UseRenderTransformProperty =
+            AvaloniaProperty.Register<LayoutTransformControl, bool>(nameof(UseRenderTransform));
 
         static LayoutTransformControl()
         {
             ClipToBoundsProperty.OverrideDefaultValue<LayoutTransformControl>(true);
 
             LayoutTransformProperty.Changed
-                .AddClassHandler<LayoutTransformControl>(x => x.OnLayoutTransformChanged);
+                .AddClassHandler<LayoutTransformControl>((x, e) => x.OnLayoutTransformChanged(e));
 
             ChildProperty.Changed
-                .AddClassHandler<LayoutTransformControl>(x => x.OnChildChanged);
-            UseRenderTransformProperty.Changed.AddClassHandler<LayoutTransformControl>(x => x.OnUseRenderTransformPropertyChanged);
+                .AddClassHandler<LayoutTransformControl>((x, e) => x.OnChildChanged(e));
+
+            UseRenderTransformProperty.Changed
+                .AddClassHandler<LayoutTransformControl>((x, e) => x.OnUseRenderTransformPropertyChanged(e));
         }
 
         /// <summary>
         /// Gets or sets a graphics transformation that should apply to this element when layout is performed.
         /// </summary>
-        public Transform LayoutTransform
+        public ITransform? LayoutTransform
         {
             get { return GetValue(LayoutTransformProperty); }
             set { SetValue(LayoutTransformProperty, value); }
@@ -53,7 +52,7 @@ namespace Avalonia.Controls
             set { SetValue(UseRenderTransformProperty, value); }
         }
 
-        public IControl TransformRoot => Child;
+        public IControl? TransformRoot => Child;
 
         /// <summary>
         /// Provides the behavior for the "Arrange" pass of layout.
@@ -147,7 +146,7 @@ namespace Avalonia.Controls
             return transformedDesiredSize;
         }
 
-        IDisposable _renderTransformChangedEvent;
+        IDisposable? _renderTransformChangedEvent;
 
         private void OnUseRenderTransformPropertyChanged(AvaloniaPropertyChangedEventArgs e)
         {
@@ -159,7 +158,7 @@ namespace Avalonia.Controls
             //       workaround.
 
             var target = e.Sender as LayoutTransformControl;
-            var shouldUseRenderTransform = (bool)e.NewValue;
+            var shouldUseRenderTransform = (bool)e.NewValue!;
             if (target != null)
             {
                 if (shouldUseRenderTransform)
@@ -218,7 +217,7 @@ namespace Avalonia.Controls
         /// Transformation matrix corresponding to _matrixTransform.
         /// </summary>
         private Matrix _transformation;
-        private IDisposable _transformChangedEvent = null;
+        private IDisposable? _transformChangedEvent = null;
 
         /// <summary>
         /// Returns true if Size a is smaller than Size b in either dimension.

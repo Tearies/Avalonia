@@ -1,10 +1,9 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace Avalonia.Utilities
 {
@@ -13,7 +12,7 @@ namespace Avalonia.Utilities
     /// </summary>
     public static class TypeUtilities
     {
-        private static int[] Conversions =
+        private static readonly int[] Conversions =
         {
             0b101111111111101, // Boolean
             0b100001111111110, // Char
@@ -32,7 +31,7 @@ namespace Avalonia.Utilities
             0b111111111111111, // String
         };
 
-        private static int[] ImplicitConversions =
+        private static readonly int[] ImplicitConversions =
         {
             0b000000000000001, // Boolean
             0b001110111100010, // Char
@@ -51,7 +50,7 @@ namespace Avalonia.Utilities
             0b100000000000000, // String
         };
 
-        private static Type[] InbuiltTypes =
+        private static readonly Type[] InbuiltTypes =
         {
             typeof(Boolean),
             typeof(Char),
@@ -70,7 +69,7 @@ namespace Avalonia.Utilities
             typeof(String),
         };
 
-        private static readonly Type[] NumericTypes = new[]
+        private static readonly Type[] NumericTypes =
         {
             typeof(Byte),
             typeof(Decimal),
@@ -92,19 +91,41 @@ namespace Avalonia.Utilities
         /// <returns>True if the type accepts null values; otherwise false.</returns>
         public static bool AcceptsNull(Type type)
         {
-            var t = type.GetTypeInfo();
-            return !t.IsValueType || (t.IsGenericType && (t.GetGenericTypeDefinition() == typeof(Nullable<>)));
+            return !type.IsValueType || IsNullableType(type);
+        }
+
+        /// <summary>
+        /// Returns a value indicating whether null can be assigned to the specified type.
+        /// </summary>
+        /// <typeparam name="T">The type</typeparam>
+        /// <returns>True if the type accepts null values; otherwise false.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool AcceptsNull<T>()
+        {
+            return default(T) is null;
+        }
+
+        /// <summary>
+        /// Returns a value indicating whether value can be casted to the specified type.
+        /// If value is null, checks if instances of that type can be null.
+        /// </summary>
+        /// <typeparam name="T">The type to cast to</typeparam>
+        /// <param name="value">The value to check if cast possible</param>
+        /// <returns>True if the cast is possible, otherwise false.</returns>
+        public static bool CanCast<T>(object? value)
+        {
+            return value is T || (value is null && AcceptsNull<T>());
         }
 
         /// <summary>
         /// Try to convert a value to a type by any means possible.
         /// </summary>
-        /// <param name="to">The type to cast to.</param>
-        /// <param name="value">The value to cast.</param>
+        /// <param name="to">The type to convert to.</param>
+        /// <param name="value">The value to convert.</param>
         /// <param name="culture">The culture to use.</param>
-        /// <param name="result">If successful, contains the cast value.</param>
+        /// <param name="result">If successful, contains the convert value.</param>
         /// <returns>True if the cast was successful, otherwise false.</returns>
-        public static bool TryConvert(Type to, object value, CultureInfo culture, out object result)
+        public static bool TryConvert(Type to, object? value, CultureInfo? culture, out object? result)
         {
             if (value == null)
             {
@@ -118,47 +139,46 @@ namespace Avalonia.Utilities
                 return true;
             }
 
+            var toUnderl = Nullable.GetUnderlyingType(to) ?? to;
             var from = value.GetType();
-            var fromTypeInfo = from.GetTypeInfo();
-            var toTypeInfo = to.GetTypeInfo();
 
-            if (toTypeInfo.IsAssignableFrom(fromTypeInfo))
+            if (toUnderl.IsAssignableFrom(from))
             {
                 result = value;
                 return true;
             }
 
-            if (to == typeof(string))
+            if (toUnderl == typeof(string))
             {
-                result = Convert.ToString(value);
+                result = Convert.ToString(value, culture);
                 return true;
             }
 
-            if (toTypeInfo.IsEnum && from == typeof(string))
+            if (toUnderl.IsEnum && from == typeof(string))
             {
-                if (Enum.IsDefined(to, (string)value))
+                if (Enum.IsDefined(toUnderl, (string)value))
                 {
-                    result = Enum.Parse(to, (string)value);
+                    result = Enum.Parse(toUnderl, (string)value);
                     return true;
                 }
             }
 
-            if (!fromTypeInfo.IsEnum && toTypeInfo.IsEnum)
+            if (!from.IsEnum && toUnderl.IsEnum)
             {
                 result = null;
 
-                if (TryConvert(Enum.GetUnderlyingType(to), value, culture, out object enumValue))
+                if (TryConvert(Enum.GetUnderlyingType(toUnderl), value, culture, out var enumValue))
                 {
-                    result = Enum.ToObject(to, enumValue);
+                    result = Enum.ToObject(toUnderl, enumValue!);
                     return true;
                 }
             }
 
-            if (fromTypeInfo.IsEnum && IsNumeric(to))
+            if (from.IsEnum && IsNumeric(toUnderl))
             {
                 try
                 {
-                    result = Convert.ChangeType((int)value, to, culture);
+                    result = Convert.ChangeType((int)value, toUnderl, culture);
                     return true;
                 }
                 catch
@@ -169,7 +189,7 @@ namespace Avalonia.Utilities
             }
 
             var convertableFrom = Array.IndexOf(InbuiltTypes, from);
-            var convertableTo = Array.IndexOf(InbuiltTypes, to);
+            var convertableTo = Array.IndexOf(InbuiltTypes, toUnderl);
 
             if (convertableFrom != -1 && convertableTo != -1)
             {
@@ -177,7 +197,7 @@ namespace Avalonia.Utilities
                 {
                     try
                     {
-                        result = Convert.ChangeType(value, to, culture);
+                        result = Convert.ChangeType(value, toUnderl, culture);
                         return true;
                     }
                     catch
@@ -188,8 +208,23 @@ namespace Avalonia.Utilities
                 }
             }
 
-            var cast = from.GetRuntimeMethods()
-                .FirstOrDefault(m => (m.Name == "op_Implicit" || m.Name == "op_Explicit") && m.ReturnType == to);
+            var toTypeConverter = TypeDescriptor.GetConverter(toUnderl);
+
+            if (toTypeConverter.CanConvertFrom(from) == true)
+            {
+                result = toTypeConverter.ConvertFrom(null, culture, value);
+                return true;
+            }
+
+            var fromTypeConverter = TypeDescriptor.GetConverter(from);
+
+            if (fromTypeConverter.CanConvertTo(toUnderl) == true)
+            {
+                result = fromTypeConverter.ConvertTo(null, culture, value, toUnderl);
+                return true;
+            }
+
+            var cast = FindTypeConversionOperatorMethod(from, toUnderl, OperatorType.Implicit | OperatorType.Explicit);
 
             if (cast != null)
             {
@@ -205,11 +240,11 @@ namespace Avalonia.Utilities
         /// Try to convert a value to a type using the implicit conversions allowed by the C#
         /// language.
         /// </summary>
-        /// <param name="to">The type to cast to.</param>
-        /// <param name="value">The value to cast.</param>
-        /// <param name="result">If successful, contains the cast value.</param>
-        /// <returns>True if the cast was successful, otherwise false.</returns>
-        public static bool TryConvertImplicit(Type to, object value, out object result)
+        /// <param name="to">The type to convert to.</param>
+        /// <param name="value">The value to convert.</param>
+        /// <param name="result">If successful, contains the converted value.</param>
+        /// <returns>True if the convert was successful, otherwise false.</returns>
+        public static bool TryConvertImplicit(Type to, object? value, out object? result)
         {
             if (value == null)
             {
@@ -224,10 +259,8 @@ namespace Avalonia.Utilities
             }
 
             var from = value.GetType();
-            var fromTypeInfo = from.GetTypeInfo();
-            var toTypeInfo = to.GetTypeInfo();
 
-            if (toTypeInfo.IsAssignableFrom(fromTypeInfo))
+            if (to.IsAssignableFrom(from))
             {
                 result = value;
                 return true;
@@ -253,8 +286,7 @@ namespace Avalonia.Utilities
                 }
             }
 
-            var cast = from.GetRuntimeMethods()
-                .FirstOrDefault(m => m.Name == "op_Implicit" && m.ReturnType == to);
+            var cast = FindTypeConversionOperatorMethod(from, to, OperatorType.Implicit);
 
             if (cast != null)
             {
@@ -270,25 +302,36 @@ namespace Avalonia.Utilities
         /// Convert a value to a type by any means possible, returning the default for that type
         /// if the value could not be converted.
         /// </summary>
-        /// <param name="value">The value to cast.</param>
-        /// <param name="type">The type to cast to..</param>
+        /// <param name="value">The value to convert.</param>
+        /// <param name="type">The type to convert to..</param>
         /// <param name="culture">The culture to use.</param>
         /// <returns>A value of <paramref name="type"/>.</returns>
-        public static object ConvertOrDefault(object value, Type type, CultureInfo culture)
+        public static object? ConvertOrDefault(object? value, Type type, CultureInfo culture)
         {
-            return TryConvert(type, value, culture, out object result) ? result : Default(type);
+            return TryConvert(type, value, culture, out var result) ? result : Default(type);
         }
 
         /// <summary>
         /// Convert a value to a type using the implicit conversions allowed by the C# language or
         /// return the default for the type if the value could not be converted.
         /// </summary>
-        /// <param name="value">The value to cast.</param>
-        /// <param name="type">The type to cast to..</param>
+        /// <param name="value">The value to convert.</param>
+        /// <param name="type">The type to convert to.</param>
         /// <returns>A value of <paramref name="type"/>.</returns>
-        public static object ConvertImplicitOrDefault(object value, Type type)
+        public static object? ConvertImplicitOrDefault(object? value, Type type)
         {
-            return TryConvertImplicit(type, value, out object result) ? result : Default(type);
+            return TryConvertImplicit(type, value, out var result) ? result : Default(type);
+        }
+
+        public static T ConvertImplicit<T>(object value)
+        {
+            if (TryConvertImplicit(typeof(T), value, out var result))
+            {
+                return (T)result!;
+            }
+
+            throw new InvalidCastException(
+                $"Unable to convert object '{value ?? "(null)"}' of type '{value?.GetType()}' to type '{typeof(T)}'.");
         }
 
         /// <summary>
@@ -296,11 +339,9 @@ namespace Avalonia.Utilities
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>The default value.</returns>
-        public static object Default(Type type)
+        public static object? Default(Type type)
         {
-            var typeInfo = type.GetTypeInfo();
-
-            if (typeInfo.IsValueType)
+            if (type.IsValueType)
             {
                 return Activator.CreateInstance(type);
             }
@@ -326,14 +367,57 @@ namespace Avalonia.Utilities
                 return false;
             }
 
-            if (type.GetTypeInfo().IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            var underlyingType = Nullable.GetUnderlyingType(type);
+
+            if (underlyingType != null)
             {
-                return IsNumeric(Nullable.GetUnderlyingType(type));
+                return IsNumeric(underlyingType);
             }
             else
             {
                 return NumericTypes.Contains(type);
             }
+        }
+
+        [Flags]
+        private enum OperatorType
+        {
+            Implicit = 1,
+            Explicit = 2
+        }
+
+        private static bool IsNullableType(Type type)
+        {
+            return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+        }
+
+        private static MethodInfo? FindTypeConversionOperatorMethod(Type fromType, Type toType, OperatorType operatorType)
+        {
+            const string implicitName = "op_Implicit";
+            const string explicitName = "op_Explicit";
+
+            bool allowImplicit = operatorType.HasAllFlags(OperatorType.Implicit);
+            bool allowExplicit = operatorType.HasAllFlags(OperatorType.Explicit);
+
+            foreach (MethodInfo method in fromType.GetMethods())
+            {
+                if (!method.IsSpecialName || method.ReturnType != toType)
+                {
+                    continue;
+                }
+
+                if (allowImplicit && method.Name == implicitName)
+                {
+                    return method;
+                }
+
+                if (allowExplicit && method.Name == explicitName)
+                {
+                    return method;
+                }
+            }
+
+            return null;
         }
     }
 }

@@ -12,7 +12,7 @@ namespace Avalonia.Controls.Embedding.Offscreen
         private double _scaling = 1;
         private Size _clientSize;
 
-        public IInputRoot InputRoot { get; private set; }
+        public IInputRoot? InputRoot { get; private set; }
         public bool IsDisposed { get; private set; }
 
         public virtual void Dispose()
@@ -31,11 +31,13 @@ namespace Avalonia.Controls.Embedding.Offscreen
             set
             {
                 _clientSize = value;
-                Resized?.Invoke(value);
+                Resized?.Invoke(value, PlatformResizeReason.Unspecified);
             }
         }
 
-        public double Scaling
+        public Size? FrameSize => null;
+
+        public double RenderScaling
         {
             get { return _scaling; }
             set
@@ -45,22 +47,34 @@ namespace Avalonia.Controls.Embedding.Offscreen
             }
         }
         
-        public Action<RawInputEventArgs> Input { get; set; }
-        public Action<Rect> Paint { get; set; }
-        public Action<Size> Resized { get; set; }
-        public Action<double> ScalingChanged { get; set; }
+        public Action<RawInputEventArgs>? Input { get; set; }
+        public Action<Rect>? Paint { get; set; }
+        public Action<Size, PlatformResizeReason>? Resized { get; set; }
+        public Action<double>? ScalingChanged { get; set; }
+
+        public Action<WindowTransparencyLevel>? TransparencyLevelChanged { get; set; }
+
+        /// <inheritdoc/>
+        public AcrylicPlatformCompensationLevels AcrylicCompensationLevels { get; } = new AcrylicPlatformCompensationLevels(1, 1, 1);
+
         public void SetInputRoot(IInputRoot inputRoot) => InputRoot = inputRoot;
 
         public virtual Point PointToClient(PixelPoint point) => point.ToPoint(1);
 
         public virtual PixelPoint PointToScreen(Point point) => PixelPoint.FromPoint(point, 1);
 
-        public virtual void SetCursor(IPlatformHandle cursor)
+        public virtual void SetCursor(ICursorImpl? cursor)
         {
         }
 
-        public Action Closed { get; set; }
+        public Action? Closed { get; set; }
+        public Action? LostFocus { get; set; }
         public abstract IMouseDevice MouseDevice { get; }
-        public IPopupImpl CreatePopup() => null;
+
+        public void SetTransparencyLevelHint(WindowTransparencyLevel transparencyLevel) { }
+
+        public WindowTransparencyLevel TransparencyLevel { get; private set; }
+
+        public IPopupImpl? CreatePopup() => null;
     }
 }

@@ -1,26 +1,33 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <IsPackable>false</IsPackable>
+    <PackAvaloniaNative Condition="'$(PackAvaloniaNative)' == ''">$([MSBuild]::IsOSPlatform(OSX))</PackAvaloniaNative>
+    <IsPackable>$(PackAvaloniaNative)</IsPackable>
     <IsPackable Condition="'$([MSBuild]::IsOSPlatform(OSX))' == 'True'">true</IsPackable>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <CastXmlPath Condition="Exists('/usr/bin/castxml')">/usr/bin/castxml</CastXmlPath>
-    <CastXmlPath Condition="Exists('/usr/local/bin/castxml')">/usr/local/bin/castxml</CastXmlPath>
+    <TargetFrameworks>net6.0;netstandard2.0</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <MicroComGeneratorRuntimeNamespace>Avalonia.MicroCom</MicroComGeneratorRuntimeNamespace>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(Configuration)' == 'Release' AND '$([MSBuild]::IsOSPlatform(OSX))' == 'true'">
+  <ItemGroup Condition="'$(PackAvaloniaNative)' == 'true'">
     <Content Include="../../Build/Products/Release/libAvalonia.Native.OSX.dylib">
+      <Link>libAvaloniaNative.dylib</Link>
       <PackagePath>runtimes/osx/native/libAvaloniaNative.dylib</PackagePath>
       <Pack>true</Pack>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Avalonia.Base\Metadata\NullableAttributes.cs" Link="NullableAttributes.cs" />
+  </ItemGroup>
   
   <ItemGroup>
-    <SharpGenMapping Include="Mappings.xml" />
-    <PackageReference Include="SharpGenTools.Sdk" Version="1.1.2" PrivateAssets="all" />
-    <PackageReference Include="SharpGen.Runtime.COM" Version="1.1.0" />
     <ProjectReference Include="..\..\packages\Avalonia\Avalonia.csproj" />
+    <ProjectReference Include="..\Avalonia.Dialogs\Avalonia.Dialogs.csproj" />
+    <PackageReference Include="MicroCom.CodeGenerator.MSBuild" Version="0.10.4" PrivateAssets="all" />
+    <MicroComIdl Include="avn.idl" CSharpInteropPath="Interop.Generated.cs" />
   </ItemGroup>
+
+  <Import Project="..\..\build\DevAnalyzers.props" />
 </Project>

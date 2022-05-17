@@ -1,19 +1,11 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using System;
-using System.Reactive.Linq;
-using System.Reactive.Subjects;
-using Moq;
-using Avalonia.Controls;
-using Avalonia.Data;
-using Avalonia.Styling;
-using Xunit;
-using System.Reactive.Disposables;
-using Avalonia.UnitTests;
-using Avalonia.VisualTree;
 using System.Linq;
-using Avalonia.Markup.Data;
+using System.Reactive.Linq;
+using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
+using Avalonia.Controls.Templates;
+using Avalonia.Data;
+using Avalonia.VisualTree;
+using Xunit;
 
 namespace Avalonia.Markup.UnitTests.Data
 {
@@ -22,55 +14,57 @@ namespace Avalonia.Markup.UnitTests.Data
         [Fact]
         public void OneWay_Binding_Should_Be_Set_Up()
         {
-            var target = CreateTarget();
-            var binding = new Binding
+            var source = new Button
             {
-                Mode = BindingMode.OneWay,
-                RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
-                Priority = BindingPriority.TemplatedParent,
-                Path = "Foo",
+                Template = new FuncControlTemplate<Button>((parent, _) =>
+                    new ContentPresenter
+                    {
+                        [~ContentPresenter.ContentProperty] = new Binding
+                        {
+                            Mode = BindingMode.OneWay,
+                            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+                            Path = "Content",
+                        }
+                    }),
             };
 
-            target.Object.Bind(TextBox.TextProperty, binding);
+            source.ApplyTemplate();
 
-            target.Verify(x => x.Bind(
-                TextBox.TextProperty, 
-                It.IsAny<IObservable<object>>(), 
-                BindingPriority.TemplatedParent));
+            var target = (ContentPresenter)source.GetVisualChildren().Single();
+
+            Assert.Null(target.Content);
+            source.Content = "foo";
+            Assert.Equal("foo", target.Content);
+            source.Content = "bar";
+            Assert.Equal("bar", target.Content);
         }
 
         [Fact]
         public void TwoWay_Binding_Should_Be_Set_Up()
         {
-            var target = CreateTarget();
-            var binding = new Binding
+            var source = new Button
             {
-                Mode = BindingMode.TwoWay,
-                RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
-                Priority = BindingPriority.TemplatedParent,
-                Path = "Foo",
+                Template = new FuncControlTemplate<Button>((parent, _) =>
+                    new ContentPresenter
+                    {
+                        [~ContentPresenter.ContentProperty] = new Binding
+                        {
+                            Mode = BindingMode.TwoWay,
+                            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+                            Path = "Content",
+                        }
+                    }),
             };
 
-            target.Object.Bind(TextBox.TextProperty, binding);
+            source.ApplyTemplate();
 
-            target.Verify(x => x.Bind(
-                TextBox.TextProperty,
-                It.IsAny<ISubject<object>>(),
-                BindingPriority.TemplatedParent));
-        }
+            var target = (ContentPresenter)source.GetVisualChildren().Single();
 
-        private Mock<IControl> CreateTarget(
-            ITemplatedControl templatedParent = null,
-            string text = null)
-        {
-            var result = new Mock<IControl>();
-
-            result.Setup(x => x.GetValue(Control.TemplatedParentProperty)).Returns(templatedParent);
-            result.Setup(x => x.GetValue((AvaloniaProperty)Control.TemplatedParentProperty)).Returns(templatedParent);
-            result.Setup(x => x.GetValue((AvaloniaProperty)TextBox.TextProperty)).Returns(text);
-            result.Setup(x => x.Bind(It.IsAny<AvaloniaProperty>(), It.IsAny<IObservable<object>>(), It.IsAny<BindingPriority>()))
-                .Returns(Disposable.Empty);
-            return result;
+            Assert.Null(target.Content);
+            source.Content = "foo";
+            Assert.Equal("foo", target.Content);
+            target.Content = "bar";
+            Assert.Equal("bar", source.Content);
         }
     }
 }

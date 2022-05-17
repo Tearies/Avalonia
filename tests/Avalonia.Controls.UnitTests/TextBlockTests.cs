@@ -1,6 +1,5 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
+using System;
+using Avalonia.Controls.Documents;
 using Avalonia.Data;
 using Avalonia.Media;
 using Avalonia.Rendering;
@@ -40,7 +39,7 @@ namespace Avalonia.Controls.UnitTests
 
             var root = new TestRoot(target);
             var renderer = Mock.Get(root.Renderer);
-            renderer.ResetCalls();
+            renderer.Invocations.Clear();
 
             ((SolidColorBrush)target.Background).Color = Colors.Green;
 
@@ -57,11 +56,53 @@ namespace Avalonia.Controls.UnitTests
 
             var root = new TestRoot(target);
             var renderer = Mock.Get(root.Renderer);
-            renderer.ResetCalls();
+            renderer.Invocations.Clear();
 
             ((SolidColorBrush)target.Foreground).Color = Colors.Green;
 
             renderer.Verify(x => x.AddDirty(target), Times.Once);
+        }
+
+        [Fact]
+        public void Changing_InlinesCollection_Should_Invalidate_Measure()
+        {
+            using (UnitTestApplication.Start(TestServices.MockPlatformRenderInterface))
+            {
+                var target = new TextBlock();
+
+                target.Measure(Size.Infinity);
+           
+                Assert.True(target.IsMeasureValid);
+           
+                target.Inlines.Add(new Run("Hello"));
+           
+                Assert.False(target.IsMeasureValid);
+           
+                target.Measure(Size.Infinity);
+           
+                Assert.True(target.IsMeasureValid);
+            }
+        }
+        
+        [Fact]
+        public void Changing_Inlines_Properties_Should_Invalidate_Measure()
+        {
+            using (UnitTestApplication.Start(TestServices.MockPlatformRenderInterface))
+            {
+                var target = new TextBlock();
+
+                var inline = new Run("Hello");
+                
+                target.Inlines.Add(inline);
+
+                target.Measure(Size.Infinity);
+           
+                Assert.True(target.IsMeasureValid);
+
+                inline.Text = "1337";
+                
+                Assert.False(target.IsMeasureValid);
+            }
         }
     }
 }

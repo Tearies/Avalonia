@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using Avalonia.Layout;
 using Avalonia.Metadata;
 
@@ -14,8 +11,8 @@ namespace Avalonia.Controls
         /// <summary>
         /// Defines the <see cref="Child"/> property.
         /// </summary>
-        public static readonly StyledProperty<IControl> ChildProperty =
-            AvaloniaProperty.Register<Decorator, IControl>(nameof(Child));
+        public static readonly StyledProperty<IControl?> ChildProperty =
+            AvaloniaProperty.Register<Decorator, IControl?>(nameof(Child));
 
         /// <summary>
         /// Defines the <see cref="Padding"/> property.
@@ -29,14 +26,14 @@ namespace Avalonia.Controls
         static Decorator()
         {
             AffectsMeasure<Decorator>(ChildProperty, PaddingProperty);
-            ChildProperty.Changed.AddClassHandler<Decorator>(x => x.ChildChanged);
+            ChildProperty.Changed.AddClassHandler<Decorator>((x, e) => x.ChildChanged(e));
         }
 
         /// <summary>
         /// Gets or sets the decorated control.
         /// </summary>
         [Content]
-        public IControl Child
+        public IControl? Child
         {
             get { return GetValue(ChildProperty); }
             set { SetValue(ChildProperty, value); }
@@ -69,8 +66,8 @@ namespace Avalonia.Controls
         /// <param name="e">The event args.</param>
         private void ChildChanged(AvaloniaPropertyChangedEventArgs e)
         {
-            var oldChild = (Control)e.OldValue;
-            var newChild = (Control)e.NewValue;
+            var oldChild = (Control?)e.OldValue;
+            var newChild = (Control?)e.NewValue;
 
             if (oldChild != null)
             {

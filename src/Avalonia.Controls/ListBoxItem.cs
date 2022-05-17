@@ -1,6 +1,5 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
+using Avalonia.Automation.Peers;
+using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Mixins;
 
 namespace Avalonia.Controls
@@ -8,6 +7,7 @@ namespace Avalonia.Controls
     /// <summary>
     /// A selectable item in a <see cref="ListBox"/>.
     /// </summary>
+    [PseudoClasses(":pressed", ":selected")]
     public class ListBoxItem : ContentControl, ISelectable
     {
         /// <summary>
@@ -22,6 +22,7 @@ namespace Avalonia.Controls
         static ListBoxItem()
         {
             SelectableMixin.Attach<ListBoxItem>(IsSelectedProperty);
+            PressedMixin.Attach<ListBoxItem>();
             FocusableProperty.OverrideDefaultValue<ListBoxItem>(true);
         }
 
@@ -32,6 +33,11 @@ namespace Avalonia.Controls
         {
             get { return GetValue(IsSelectedProperty); }
             set { SetValue(IsSelectedProperty, value); }
+        }
+
+        protected override AutomationPeer OnCreateAutomationPeer()
+        {
+            return new ListItemAutomationPeer(this);
         }
     }
 }

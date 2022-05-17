@@ -1,45 +1,101 @@
-﻿using System;
-using Avalonia.Media;
+﻿using Avalonia.Media;
+using Avalonia.Metadata;
 
 namespace Avalonia.Controls
 {
     /// <summary>
-    /// Viewbox is used to scale single child.
+    /// Viewbox is used to scale single child to fit in the available space.
     /// </summary>
-    /// <seealso cref="Avalonia.Controls.Decorator" />
-    public class Viewbox : Decorator
+    public class Viewbox : Control
     {
-        /// <summary>
-        /// The stretch property
-        /// </summary>
-        public static readonly AvaloniaProperty<Stretch> StretchProperty =
-                AvaloniaProperty.RegisterDirect<Viewbox, Stretch>(nameof(Stretch),
-                    v => v.Stretch, (c, v) => c.Stretch = v, Stretch.Uniform);
+        private Decorator _containerVisual;
 
-        private Stretch _stretch = Stretch.Uniform;
+        /// <summary>
+        /// Defines the <see cref="Stretch"/> property.
+        /// </summary>
+        public static readonly StyledProperty<Stretch> StretchProperty =
+            AvaloniaProperty.Register<Viewbox, Stretch>(nameof(Stretch), Stretch.Uniform);
+
+        /// <summary>
+        /// Defines the <see cref="StretchDirection"/> property.
+        /// </summary>
+        public static readonly StyledProperty<StretchDirection> StretchDirectionProperty =
+            AvaloniaProperty.Register<Viewbox, StretchDirection>(nameof(StretchDirection), StretchDirection.Both);
+
+        /// <summary>
+        /// Defines the <see cref="Child"/> property
+        /// </summary>
+        public static readonly StyledProperty<IControl?> ChildProperty =
+            Decorator.ChildProperty.AddOwner<Viewbox>();
+
+        static Viewbox()
+        {
+            ClipToBoundsProperty.OverrideDefaultValue<Viewbox>(true);
+            UseLayoutRoundingProperty.OverrideDefaultValue<Viewbox>(true);
+            AffectsMeasure<Viewbox>(StretchProperty, StretchDirectionProperty);
+        }
+
+        public Viewbox()
+        {
+            _containerVisual = new Decorator();
+            _containerVisual.RenderTransformOrigin = RelativePoint.TopLeft;
+            LogicalChildren.Add(_containerVisual);
+            VisualChildren.Add(_containerVisual);
+        }
 
         /// <summary>
         /// Gets or sets the stretch mode, 
         /// which determines how child fits into the available space.
         /// </summary>
-        /// <value>
-        /// The stretch.
-        /// </value>
         public Stretch Stretch
         {
-            get => _stretch;
-            set => SetAndRaise(StretchProperty, ref _stretch, value);
+            get => GetValue(StretchProperty);
+            set => SetValue(StretchProperty, value);
         }
 
-        static Viewbox()
+        /// <summary>
+        /// Gets or sets a value controlling in what direction contents will be stretched.
+        /// </summary>
+        public StretchDirection StretchDirection
         {
-            ClipToBoundsProperty.OverrideDefaultValue<Viewbox>(true);
-            AffectsMeasure<Viewbox>(StretchProperty);
+            get => GetValue(StretchDirectionProperty);
+            set => SetValue(StretchDirectionProperty, value);
+        }
+
+        /// <summary>
+        /// Gets or sets the child of the Viewbox
+        /// </summary>
+        [Content]
+        public IControl? Child
+        {
+            get => GetValue(ChildProperty);
+            set => SetValue(ChildProperty, value);
+        }
+
+        /// <summary>
+        /// Gets or sets the transform applied to the container visual that
+        /// hosts the child of the Viewbox
+        /// </summary>
+        protected internal ITransform? InternalTransform
+        {
+            get => _containerVisual.RenderTransform;
+            set => _containerVisual.RenderTransform = value;
+        }
+
+        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+        {
+            base.OnPropertyChanged(change);
+
+            if (change.Property == ChildProperty)
+            {
+                _containerVisual.Child = change.GetNewValue<IControl>();
+                InvalidateMeasure();
+            }
         }
 
         protected override Size MeasureOverride(Size availableSize)
         {
-            var child = Child;
+            var child = _containerVisual;
 
             if (child != null)
             {
@@ -47,9 +103,9 @@ namespace Avalonia.Controls
 
                 var childSize = child.DesiredSize;
 
-                var scale = GetScale(availableSize, childSize, Stretch);
+                var size = Stretch.CalculateSize(availableSize, childSize, StretchDirection);
 
-                return (childSize * scale).Constrain(availableSize);
+                return size;
             }
 
             return new Size();
@@ -57,68 +113,21 @@ namespace Avalonia.Controls
 
         protected override Size ArrangeOverride(Size finalSize)
         {
-            var child = Child;
+            var child = _containerVisual;
 
             if (child != null)
             {
                 var childSize = child.DesiredSize;
-                var scale = GetScale(finalSize, childSize, Stretch);
-                var scaleTransform = child.RenderTransform as ScaleTransform;
+                var scale = Stretch.CalculateScaling(finalSize, childSize, StretchDirection);
 
-                if (scaleTransform == null)
-                {
-                    child.RenderTransform = scaleTransform = new ScaleTransform(scale.X, scale.Y);
-                    child.RenderTransformOrigin = RelativePoint.TopLeft;
-                }
-
-                scaleTransform.ScaleX = scale.X;
-                scaleTransform.ScaleY = scale.Y;
+                InternalTransform = new ScaleTransform(scale.X, scale.Y);
 
                 child.Arrange(new Rect(childSize));
 
                 return childSize * scale;
             }
 
-            return new Size();
-        }
-
-        private static Vector GetScale(Size availableSize, Size childSize, Stretch stretch)
-        {
-            double scaleX = 1.0;
-            double scaleY = 1.0;
-
-            bool validWidth = !double.IsPositiveInfinity(availableSize.Width);
-            bool validHeight = !double.IsPositiveInfinity(availableSize.Height);
-
-            if (stretch != Stretch.None && (validWidth || validHeight))
-            {
-                scaleX = childSize.Width <= 0.0 ? 0.0 : availableSize.Width / childSize.Width;
-                scaleY = childSize.Height <= 0.0 ? 0.0 : availableSize.Height / childSize.Height;
-
-                if (!validWidth)
-                {
-                    scaleX = scaleY;
-                }
-                else if (!validHeight)
-                {
-                    scaleY = scaleX;
-                }
-                else
-                {
-                    switch (stretch)
-                    {
-                        case Stretch.Uniform:
-                            scaleX = scaleY = Math.Min(scaleX, scaleY);
-                            break;
-
-                        case Stretch.UniformToFill:
-                            scaleX = scaleY = Math.Max(scaleX, scaleY);
-                            break;
-                    }
-                }
-            }
-
-            return new Vector(scaleX, scaleY);
+            return finalSize;
         }
     }
 }

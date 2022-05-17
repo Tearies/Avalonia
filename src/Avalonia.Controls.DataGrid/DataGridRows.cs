@@ -5,6 +5,7 @@
 
 using Avalonia.Collections;
 using Avalonia.Controls.Utils;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Utilities;
 using System;
@@ -329,7 +330,7 @@ namespace Avalonia.Controls
 
         internal void OnRowsMeasure()
         {
-            if (!DoubleUtil.IsZero(DisplayData.PendingVerticalScrollHeight))
+            if (!MathUtilities.IsZero(DisplayData.PendingVerticalScrollHeight))
             {
                 ScrollSlotsByHeight(DisplayData.PendingVerticalScrollHeight);
                 DisplayData.PendingVerticalScrollHeight = 0;
@@ -425,14 +426,14 @@ namespace Avalonia.Controls
                 UpdateDisplayedRows(DisplayData.FirstScrollingSlot, CellsHeight);
             }
 
-            if (DisplayData.FirstScrollingSlot < slot && DisplayData.LastScrollingSlot > slot)
+            if (DisplayData.FirstScrollingSlot < slot && (DisplayData.LastScrollingSlot > slot || DisplayData.LastScrollingSlot == -1))
             {
                 // The row is already displayed in its entirety
                 return true;
             }
             else if (DisplayData.FirstScrollingSlot == slot && slot != -1)
             {
-                if (!DoubleUtil.IsZero(NegVerticalOffset))
+                if (!MathUtilities.IsZero(NegVerticalOffset))
                 {
                     // First displayed row is partially scrolled of. Let's scroll it so that NegVerticalOffset becomes 0.
                     DisplayData.PendingVerticalScrollHeight = -NegVerticalOffset;
@@ -447,7 +448,7 @@ namespace Avalonia.Controls
             {
                 // Scroll up to the new row so it becomes the first displayed row
                 firstFullSlot = DisplayData.FirstScrollingSlot - 1;
-                if (DoubleUtil.GreaterThan(NegVerticalOffset, 0))
+                if (MathUtilities.GreaterThan(NegVerticalOffset, 0))
                 {
                     deltaY = -NegVerticalOffset;
                 }
@@ -470,7 +471,7 @@ namespace Avalonia.Controls
                 // Figure out how much of the last row is cut off
                 double rowHeight = GetExactSlotElementHeight(DisplayData.LastScrollingSlot);
                 double availableHeight = AvailableSlotElementRoom + rowHeight;
-                if (DoubleUtil.AreClose(rowHeight, availableHeight))
+                if (MathUtilities.AreClose(rowHeight, availableHeight))
                 {
                     if (DisplayData.LastScrollingSlot == slot)
                     {
@@ -499,7 +500,7 @@ namespace Avalonia.Controls
                 {
                     ResetDisplayedRows();
                 }
-                if (DoubleUtil.GreaterThanOrClose(GetExactSlotElementHeight(slot), CellsHeight))
+                if (MathUtilities.GreaterThanOrClose(GetExactSlotElementHeight(slot), CellsHeight))
                 {
                     // The entire row won't fit in the DataGrid so we start showing it from the top
                     NegVerticalOffset = 0;
@@ -519,7 +520,7 @@ namespace Avalonia.Controls
             }
 
             // 
-            Debug.Assert(DoubleUtil.LessThanOrClose(NegVerticalOffset, _verticalOffset));
+            Debug.Assert(MathUtilities.LessThanOrClose(NegVerticalOffset, _verticalOffset));
 
             SetVerticalOffset(_verticalOffset);
 
@@ -811,7 +812,7 @@ namespace Avalonia.Controls
                 if (row.Slot > slotDeleted)
                 {
                     CorrectRowAfterDeletion(row, wasRow);
-                    row.EnsureBackground();
+                    _rowsPresenter?.InvalidateChildIndex(row);
                 }
             }
 
@@ -867,7 +868,7 @@ namespace Avalonia.Controls
                 if (row.Slot >= slotInserted)
                 {
                     DataGrid.CorrectRowAfterInsertion(row, rowInserted);
-                    row.EnsureBackground();
+                    _rowsPresenter?.InvalidateChildIndex(row);
                 }
             }
 
@@ -1193,7 +1194,7 @@ namespace Avalonia.Controls
                 else
                 {
                     groupHeader = element as DataGridRowGroupHeader;
-                    Debug.Assert(groupHeader != null);  // Nothig other and Rows and RowGroups now
+                    Debug.Assert(groupHeader != null);  // Nothing other and Rows and RowGroups now
                     if (groupHeader != null)
                     {
                         groupHeader.TotalIndent = (groupHeader.Level == 0) ? 0 : RowGroupSublevelIndents[groupHeader.Level - 1];
@@ -1485,8 +1486,8 @@ namespace Avalonia.Controls
             // If the row has been recycled, reapply the BackgroundBrush
             if (row.IsRecycled)
             {
-                row.EnsureBackground();
                 row.ApplyCellsState();
+                _rowsPresenter?.InvalidateChildIndex(row);
             }
             else if (row == EditingRow)
             {
@@ -1636,7 +1637,7 @@ namespace Avalonia.Controls
             if (slot >= DisplayData.FirstScrollingSlot &&
                 slot <= DisplayData.LastScrollingSlot)
             {
-                // Additional row takes the spot of a displayed row - it is necessarilly displayed
+                // Additional row takes the spot of a displayed row - it is necessarily displayed
                 return true;
             }
             else if (DisplayData.FirstScrollingSlot == -1 &&
@@ -1660,7 +1661,7 @@ namespace Avalonia.Controls
         private void ScrollSlotsByHeight(double height)
         {
             Debug.Assert(DisplayData.FirstScrollingSlot >= 0);
-            Debug.Assert(!DoubleUtil.IsZero(height));
+            Debug.Assert(!MathUtilities.IsZero(height));
 
             _scrollingByHeight = true;
             try
@@ -1672,7 +1673,7 @@ namespace Avalonia.Controls
                 {
                     // Scrolling Down
                     int lastVisibleSlot = GetPreviousVisibleSlot(SlotCount);
-                    if (_vScrollBar != null && DoubleUtil.AreClose(_vScrollBar.Maximum, newVerticalOffset))
+                    if (_vScrollBar != null && MathUtilities.AreClose(_vScrollBar.Maximum, newVerticalOffset))
                     {
                         // We've scrolled to the bottom of the ScrollBar, automatically place the user at the very bottom
                         // of the DataGrid.  If this produces very odd behavior, evaluate the coping strategy used by
@@ -1684,7 +1685,7 @@ namespace Avalonia.Controls
                     else
                     {
                         deltaY = GetSlotElementHeight(newFirstScrollingSlot) - NegVerticalOffset;
-                        if (DoubleUtil.LessThan(height, deltaY))
+                        if (MathUtilities.LessThan(height, deltaY))
                         {
                             // We've merely covered up more of the same row we're on
                             NegVerticalOffset += height;
@@ -1707,7 +1708,7 @@ namespace Avalonia.Controls
                             }
                             else
                             {
-                                while (DoubleUtil.LessThanOrClose(deltaY, height))
+                                while (MathUtilities.LessThanOrClose(deltaY, height))
                                 {
                                     if (newFirstScrollingSlot < lastVisibleSlot)
                                     {
@@ -1727,7 +1728,7 @@ namespace Avalonia.Controls
 
                                     double rowHeight = GetExactSlotElementHeight(newFirstScrollingSlot);
                                     double remainingHeight = height - deltaY;
-                                    if (DoubleUtil.LessThanOrClose(rowHeight, remainingHeight))
+                                    if (MathUtilities.LessThanOrClose(rowHeight, remainingHeight))
                                     {
                                         deltaY += rowHeight;
                                     }
@@ -1744,7 +1745,7 @@ namespace Avalonia.Controls
                 else
                 {
                     // Scrolling Up
-                    if (DoubleUtil.GreaterThanOrClose(height + NegVerticalOffset, 0))
+                    if (MathUtilities.GreaterThanOrClose(height + NegVerticalOffset, 0))
                     {
                         // We've merely exposing more of the row we're on
                         NegVerticalOffset += height;
@@ -1778,7 +1779,7 @@ namespace Avalonia.Controls
                         else
                         {
                             int lastScrollingSlot = DisplayData.LastScrollingSlot;
-                            while (DoubleUtil.GreaterThan(deltaY, height))
+                            while (MathUtilities.GreaterThan(deltaY, height))
                             {
                                 if (newFirstScrollingSlot > 0)
                                 {
@@ -1797,7 +1798,7 @@ namespace Avalonia.Controls
                                 }
                                 double rowHeight = GetExactSlotElementHeight(newFirstScrollingSlot);
                                 double remainingHeight = height - deltaY;
-                                if (DoubleUtil.LessThanOrClose(rowHeight + remainingHeight, 0))
+                                if (MathUtilities.LessThanOrClose(rowHeight + remainingHeight, 0))
                                 {
                                     deltaY -= rowHeight;
                                 }
@@ -1809,7 +1810,7 @@ namespace Avalonia.Controls
                             }
                         }
                     }
-                    if (DoubleUtil.GreaterThanOrClose(0, newVerticalOffset) && newFirstScrollingSlot != 0)
+                    if (MathUtilities.GreaterThanOrClose(0, newVerticalOffset) && newFirstScrollingSlot != 0)
                     {
                         // We've scrolled to the top of the ScrollBar, automatically place the user at the very top
                         // of the DataGrid.  If this produces very odd behavior, evaluate the RowHeight estimate.  
@@ -1822,10 +1823,10 @@ namespace Avalonia.Controls
                 }
 
                 double firstRowHeight = GetExactSlotElementHeight(newFirstScrollingSlot);
-                if (DoubleUtil.LessThan(firstRowHeight, NegVerticalOffset))
+                if (MathUtilities.LessThan(firstRowHeight, NegVerticalOffset))
                 {
                     // We've scrolled off more of the first row than what's possible.  This can happen
-                    // if the first row got shorter (Ex: Collpasing RowDetails) or if the user has a recycling
+                    // if the first row got shorter (Ex: Collapsing RowDetails) or if the user has a recycling
                     // cleanup issue.  In this case, simply try to display the next row as the first row instead
                     if (newFirstScrollingSlot < SlotCount - 1)
                     {
@@ -1838,11 +1839,11 @@ namespace Avalonia.Controls
                 UpdateDisplayedRows(newFirstScrollingSlot, CellsHeight);
 
                 double firstElementHeight = GetExactSlotElementHeight(DisplayData.FirstScrollingSlot);
-                if (DoubleUtil.GreaterThan(NegVerticalOffset, firstElementHeight))
+                if (MathUtilities.GreaterThan(NegVerticalOffset, firstElementHeight))
                 {
                     int firstElementSlot = DisplayData.FirstScrollingSlot;
                     // We filled in some rows at the top and now we have a NegVerticalOffset that's greater than the first element
-                    while (newFirstScrollingSlot > 0 && DoubleUtil.GreaterThan(NegVerticalOffset, firstElementHeight))
+                    while (newFirstScrollingSlot > 0 && MathUtilities.GreaterThan(NegVerticalOffset, firstElementHeight))
                     {
                         int previousSlot = GetPreviousVisibleSlot(firstElementSlot);
                         if (previousSlot == -1)
@@ -1872,7 +1873,7 @@ namespace Avalonia.Controls
                 {
                     _verticalOffset = NegVerticalOffset;
                 }
-                else if (DoubleUtil.GreaterThan(NegVerticalOffset, newVerticalOffset))
+                else if (MathUtilities.GreaterThan(NegVerticalOffset, newVerticalOffset))
                 {
                     // The scrolled-in row was larger than anticipated. Adjust the DataGrid so the ScrollBar thumb
                     // can stay in the same place
@@ -1890,8 +1891,8 @@ namespace Avalonia.Controls
 
                 DisplayData.FullyRecycleElements();
 
-                Debug.Assert(DoubleUtil.GreaterThanOrClose(NegVerticalOffset, 0));
-                Debug.Assert(DoubleUtil.GreaterThanOrClose(_verticalOffset, NegVerticalOffset));
+                Debug.Assert(MathUtilities.GreaterThanOrClose(NegVerticalOffset, 0));
+                Debug.Assert(MathUtilities.GreaterThanOrClose(_verticalOffset, NegVerticalOffset));
             }
             finally
             {
@@ -1912,7 +1913,7 @@ namespace Avalonia.Controls
             {
                 // Assume it's a RowGroupHeader
                 DataGridRowGroupHeader groupHeader = element as DataGridRowGroupHeader;
-                groupHeader.ApplyState(useTransitions: true);
+                groupHeader.UpdatePseudoClasses();
             }
         }
 
@@ -2014,7 +2015,7 @@ namespace Avalonia.Controls
 
             if (recycleRow)
             {
-                DisplayData.AddRecylableRow(dataGridRow);
+                DisplayData.AddRecyclableRow(dataGridRow);
             }
             else
             {
@@ -2032,7 +2033,7 @@ namespace Avalonia.Controls
             double deltaY = -NegVerticalOffset;
             int visibleScrollingRows = 0;
 
-            if (DoubleUtil.LessThanOrClose(displayHeight, 0) || SlotCount == 0 || ColumnsItemsInternal.Count == 0)
+            if (MathUtilities.LessThanOrClose(displayHeight, 0) || SlotCount == 0 || ColumnsItemsInternal.Count == 0)
             {
                 return;
             }
@@ -2044,7 +2045,7 @@ namespace Avalonia.Controls
             }
 
             int slot = firstDisplayedScrollingSlot;
-            while (slot < SlotCount && !DoubleUtil.GreaterThanOrClose(deltaY, displayHeight))
+            while (slot < SlotCount && !MathUtilities.GreaterThanOrClose(deltaY, displayHeight))
             {
                 deltaY += GetExactSlotElementHeight(slot);
                 visibleScrollingRows++;
@@ -2052,7 +2053,7 @@ namespace Avalonia.Controls
                 slot = GetNextVisibleSlot(slot);
             }
 
-            while (DoubleUtil.LessThan(deltaY, displayHeight) && slot >= 0)
+            while (MathUtilities.LessThan(deltaY, displayHeight) && slot >= 0)
             {
                 slot = GetPreviousVisibleSlot(firstDisplayedScrollingSlot);
                 if (slot >= 0)
@@ -2063,14 +2064,14 @@ namespace Avalonia.Controls
                 }
             }
             // If we're up to the first row, and we still have room left, uncover as much of the first row as we can
-            if (firstDisplayedScrollingSlot == 0 && DoubleUtil.LessThan(deltaY, displayHeight))
+            if (firstDisplayedScrollingSlot == 0 && MathUtilities.LessThan(deltaY, displayHeight))
             {
                 double newNegVerticalOffset = Math.Max(0, NegVerticalOffset - displayHeight + deltaY);
                 deltaY += NegVerticalOffset - newNegVerticalOffset;
                 NegVerticalOffset = newNegVerticalOffset;
             }
 
-            if (DoubleUtil.GreaterThan(deltaY, displayHeight) || (DoubleUtil.AreClose(deltaY, displayHeight) && DoubleUtil.GreaterThan(NegVerticalOffset, 0)))
+            if (MathUtilities.GreaterThan(deltaY, displayHeight) || (MathUtilities.AreClose(deltaY, displayHeight) && MathUtilities.GreaterThan(NegVerticalOffset, 0)))
             {
                 DisplayData.NumTotallyDisplayedScrollingElements = visibleScrollingRows - 1;
             }
@@ -2108,7 +2109,7 @@ namespace Avalonia.Controls
             double deltaY = 0;
             int visibleScrollingRows = 0;
 
-            if (DoubleUtil.LessThanOrClose(displayHeight, 0) || SlotCount == 0 || ColumnsItemsInternal.Count == 0)
+            if (MathUtilities.LessThanOrClose(displayHeight, 0) || SlotCount == 0 || ColumnsItemsInternal.Count == 0)
             {
                 ResetDisplayedRows();
                 return;
@@ -2120,7 +2121,7 @@ namespace Avalonia.Controls
             }
 
             int slot = lastDisplayedScrollingRow;
-            while (DoubleUtil.LessThan(deltaY, displayHeight) && slot >= 0)
+            while (MathUtilities.LessThan(deltaY, displayHeight) && slot >= 0)
             {
                 deltaY += GetExactSlotElementHeight(slot);
                 visibleScrollingRows++;
@@ -2265,7 +2266,7 @@ namespace Avalonia.Controls
                     if (parentGroupInfo.LastSubItemSlot - parentGroupInfo.Slot == 1)
                     {
                         // We just added the first item to a RowGroup so the header should transition from Empty to either Expanded or Collapsed
-                        EnsureAnscestorsExpanderButtonChecked(parentGroupInfo);
+                        EnsureAncestorsExpanderButtonChecked(parentGroupInfo);
                     }
                 }
             }
@@ -2407,7 +2408,7 @@ namespace Avalonia.Controls
             return treeCount;
         }
 
-        private void EnsureAnscestorsExpanderButtonChecked(DataGridRowGroupInfo parentGroupInfo)
+        private void EnsureAncestorsExpanderButtonChecked(DataGridRowGroupInfo parentGroupInfo)
         {
             if (IsSlotVisible(parentGroupInfo.Slot))
             {
@@ -2542,7 +2543,7 @@ namespace Avalonia.Controls
                             double heightChange = UpdateRowGroupVisibility(rowGroupInfo, isVisible, isDisplayed: false);
                             // Use epsilon instead of 0 here so that in the off chance that our estimates put the vertical offset negative
                             // the user can still scroll to the top since the offset is non-zero
-                            SetVerticalOffset(Math.Max(DoubleUtil.DBL_EPSILON, _verticalOffset + heightChange));
+                            SetVerticalOffset(Math.Max(MathUtilities.DoubleEpsilon, _verticalOffset + heightChange));
                         }
                         else
                         {
@@ -2789,11 +2790,11 @@ namespace Avalonia.Controls
             return null;
         }
 
-        internal void OnRowGroupHeaderToggled(DataGridRowGroupHeader groupHeader, bool newIsVisibile, bool setCurrent)
+        internal void OnRowGroupHeaderToggled(DataGridRowGroupHeader groupHeader, bool newIsVisible, bool setCurrent)
         {
             Debug.Assert(groupHeader.RowGroupInfo.CollectionViewGroup.ItemCount > 0);
 
-            if (WaitForLostFocus(delegate { OnRowGroupHeaderToggled(groupHeader, newIsVisibile, setCurrent); }) || !CommitEdit())
+            if (WaitForLostFocus(delegate { OnRowGroupHeaderToggled(groupHeader, newIsVisible, setCurrent); }) || !CommitEdit())
             {
                 return;
             }
@@ -2804,7 +2805,7 @@ namespace Avalonia.Controls
                 UpdateSelectionAndCurrency(CurrentColumnIndex, groupHeader.RowGroupInfo.Slot, DataGridSelectionAction.SelectCurrent, scrollIntoView: false);
             }
 
-            UpdateRowGroupVisibility(groupHeader.RowGroupInfo, newIsVisibile, isDisplayed: true);
+            UpdateRowGroupVisibility(groupHeader.RowGroupInfo, newIsVisible, isDisplayed: true);
 
             ComputeScrollBarsLayout();
             // We need force arrange since our Scrollings Rows could update without automatically triggering layout

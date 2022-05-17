@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Reactive;
 
@@ -9,7 +6,7 @@ namespace Avalonia.Data
     /// <summary>
     /// Holds a description of a binding for <see cref="AvaloniaObject"/>'s [] operator.
     /// </summary>
-    public class IndexerDescriptor : ObservableBase<object>, IDescription
+    public class IndexerDescriptor : ObservableBase<object?>, IDescription
     {
         /// <summary>
         /// Gets or sets the binding mode.
@@ -32,7 +29,7 @@ namespace Avalonia.Data
         /// <summary>
         /// Gets or sets the source property.
         /// </summary>
-        public AvaloniaProperty Property
+        public AvaloniaProperty? Property
         {
             get;
             set;
@@ -41,7 +38,7 @@ namespace Avalonia.Data
         /// <summary>
         /// Gets or sets the source object.
         /// </summary>
-        public AvaloniaObject Source
+        public AvaloniaObject? Source
         {
             get;
             set;
@@ -53,7 +50,7 @@ namespace Avalonia.Data
         /// <remarks>
         /// If null, then <see cref="Source"/>.<see cref="Property"/> will be used.
         /// </remarks>
-        public IObservable<object> SourceObservable
+        public IObservable<object>? SourceObservable
         {
             get;
             set;
@@ -62,7 +59,7 @@ namespace Avalonia.Data
         /// <summary>
         /// Gets a description of the binding.
         /// </summary>
-        public string Description => $"{Source?.GetType().Name}.{Property.Name}";
+        public string Description => $"{Source?.GetType().Name}.{Property?.Name}";
 
         /// <summary>
         /// Makes a two-way binding.
@@ -107,9 +104,14 @@ namespace Avalonia.Data
         }
 
         /// <inheritdoc/>
-        protected override IDisposable SubscribeCore(IObserver<object> observer)
+        protected override IDisposable SubscribeCore(IObserver<object?> observer)
         {
-            return (SourceObservable ?? Source.GetObservable(Property)).Subscribe(observer);
+            if (SourceObservable is null && Source is null)
+                throw new InvalidOperationException("Cannot subscribe to IndexerDescriptor.");
+            if (Property is null)
+                throw new InvalidOperationException("Cannot subscribe to IndexerDescriptor.");
+
+            return (SourceObservable ?? Source!.GetObservable(Property)).Subscribe(observer);
         }
     }
 }

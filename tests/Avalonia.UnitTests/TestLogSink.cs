@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Reactive.Disposables;
 using Avalonia.Logging;
@@ -16,7 +13,7 @@ namespace Avalonia.UnitTests
 
     public class TestLogSink : ILogSink
     {
-        private LogCallback _callback;
+        private readonly LogCallback _callback;
 
         public TestLogSink(LogCallback callback)
         {
@@ -30,7 +27,18 @@ namespace Avalonia.UnitTests
             return Disposable.Create(() => Logger.Sink = null);
         }
 
-        public void Log(LogEventLevel level, string area, object source, string messageTemplate, params object[] propertyValues)
+        public bool IsEnabled(LogEventLevel level, string area)
+        {
+            return true;
+        }
+
+        public void Log(LogEventLevel level, string area, object source, string messageTemplate)
+        {
+            _callback(level, area, source, messageTemplate);
+        }
+
+        public void Log(LogEventLevel level, string area, object source, string messageTemplate,
+            params object[] propertyValues)
         {
             _callback(level, area, source, messageTemplate, propertyValues);
         }

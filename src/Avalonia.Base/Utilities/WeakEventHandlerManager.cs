@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,10 +23,11 @@ namespace Avalonia.Utilities
         public static void Subscribe<TTarget, TEventArgs, TSubscriber>(TTarget target, string eventName, EventHandler<TEventArgs> subscriber)
             where TEventArgs : EventArgs where TSubscriber : class
         {
-            var dic = SubscriptionTypeStorage<TEventArgs, TSubscriber>.Subscribers.GetOrCreateValue(target);
-            Subscription<TEventArgs, TSubscriber> sub;
+            _ = target ?? throw new ArgumentNullException(nameof(target));
 
-            if (!dic.TryGetValue(eventName, out sub))
+            var dic = SubscriptionTypeStorage<TEventArgs, TSubscriber>.Subscribers.GetOrCreateValue(target);
+
+            if (!dic.TryGetValue(eventName, out var sub))
             {
                 dic[eventName] = sub = new Subscription<TEventArgs, TSubscriber>(dic, typeof(TTarget), target, eventName);
             }
@@ -48,13 +46,9 @@ namespace Avalonia.Utilities
         public static void Unsubscribe<TEventArgs, TSubscriber>(object target, string eventName, EventHandler<TEventArgs> subscriber)
             where TEventArgs : EventArgs where TSubscriber : class
         {
-            SubscriptionDic<TEventArgs, TSubscriber> dic;
-
-            if (SubscriptionTypeStorage<TEventArgs, TSubscriber>.Subscribers.TryGetValue(target, out dic))
+            if (SubscriptionTypeStorage<TEventArgs, TSubscriber>.Subscribers.TryGetValue(target, out var dic))
             {
-                Subscription<TEventArgs, TSubscriber> sub;
-
-                if (dic.TryGetValue(eventName, out sub))
+                if (dic.TryGetValue(eventName, out var sub))
                 {
                     sub.Remove(subscriber);
                 }
@@ -103,11 +97,14 @@ namespace Avalonia.Utilities
                 _sdic = sdic;
                 _target = target;
                 _eventName = eventName;
-                Dictionary<string, EventInfo> evDic;
-                if (!Accessors.TryGetValue(targetType, out evDic))
+                if (!Accessors.TryGetValue(targetType, out var evDic))
                     Accessors[targetType] = evDic = new Dictionary<string, EventInfo>();
 
-                if (!evDic.TryGetValue(eventName, out _info))
+                if (evDic.TryGetValue(eventName, out var info))
+                {
+                    _info = info;
+                }
+                else
                 {
                     var ev = targetType.GetRuntimeEvents().FirstOrDefault(x => x.Name == eventName);
 
@@ -121,13 +118,13 @@ namespace Avalonia.Utilities
                 }
 
                 var del = new Action<object, T>(OnEvent);
-                _delegate = del.GetMethodInfo().CreateDelegate(_info.EventHandlerType, del.Target);
-                _info.AddMethod.Invoke(target, new[] { _delegate });
+                _delegate = del.GetMethodInfo().CreateDelegate(_info.EventHandlerType!, del.Target);
+                _info.AddMethod!.Invoke(target, new[] { _delegate });
             }
 
             void Destroy()
             {
-                _info.RemoveMethod.Invoke(_target, new[] { _delegate });
+                _info.RemoveMethod!.Invoke(_target, new[] { _delegate });
                 _sdic.Remove(_eventName);
             }
 
@@ -142,10 +139,12 @@ namespace Avalonia.Utilities
                     _data = ndata;
                 }
 
-                var subscriber = (TSubscriber)s.Target;
-                if (!s_Callers.TryGetValue(s.Method, out var caller))
-                    s_Callers[s.Method] = caller =
-                        (CallerDelegate)Delegate.CreateDelegate(typeof(CallerDelegate), null, s.Method);
+                MethodInfo method = s.Method;
+
+                var subscriber = (TSubscriber)s.Target!;
+                if (!s_Callers.TryGetValue(method, out var caller))
+                    s_Callers[method] = caller =
+                        (CallerDelegate)Delegate.CreateDelegate(typeof(CallerDelegate), null, method);
                 _data[_count] = new Descriptor
                 {
                     Caller = caller,
@@ -161,9 +160,8 @@ namespace Avalonia.Utilities
                 for (int c = 0; c < _count; ++c)
                 {
                     var reference = _data[c].Subscriber;
-                    TSubscriber instance;
 
-                    if (reference != null && reference.TryGetTarget(out instance) && instance == s)
+                    if (reference != null && reference.TryGetTarget(out var instance) && Equals(instance, s.Target))
                     {
                         _data[c] = default;
                         removed = true;
@@ -182,11 +180,16 @@ namespace Avalonia.Utilities
                 for (int c = 0; c < _count; c++)
                 {
                     var r = _data[c];
+
+                    TSubscriber? target = null;
+
+                    r.Subscriber?.TryGetTarget(out target);
+
                     //Mark current index as first empty
-                    if (r.Subscriber == null && empty == -1)
+                    if (target == null && empty == -1)
                         empty = c;
                     //If current element isn't null and we have an empty one
-                    if (r.Subscriber != null && empty != -1)
+                    if (target != null && empty != -1)
                     {
                         _data[c] = default;
                         _data[empty] = r;
@@ -205,8 +208,7 @@ namespace Avalonia.Utilities
                 for(var c=0; c<_count; c++)
                 {
                     var r = _data[c].Subscriber;
-                    TSubscriber sub;
-                    if (r.TryGetTarget(out sub))
+                    if (r.TryGetTarget(out var sub))
                     {
                         _data[c].Caller(sub, sender, eventArgs);
                     }

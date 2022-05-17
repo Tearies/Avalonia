@@ -1,30 +1,29 @@
 ﻿using System;
-using System.Linq;
+using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace Avalonia.Data.Core.Plugins
 {
-    class MethodAccessorPlugin : IPropertyAccessorPlugin
+    public class MethodAccessorPlugin : IPropertyAccessorPlugin
     {
-        public bool Match(object obj, string methodName)
-            => obj.GetType().GetRuntimeMethods().Any(x => x.Name == methodName);
+        private readonly Dictionary<(Type, string), MethodInfo?> _methodLookup =
+            new Dictionary<(Type, string), MethodInfo?>();
 
-        public IPropertyAccessor Start(WeakReference reference, string methodName)
+        public bool Match(object obj, string methodName) => GetFirstMethodWithName(obj.GetType(), methodName) != null;
+
+        public IPropertyAccessor? Start(WeakReference<object?> reference, string methodName)
         {
-            Contract.Requires<ArgumentNullException>(reference != null);
-            Contract.Requires<ArgumentNullException>(methodName != null);
+            _ = reference ?? throw new ArgumentNullException(nameof(reference));
+            _ = methodName ?? throw new ArgumentNullException(nameof(methodName));
 
-            var instance = reference.Target;
-            var method = instance.GetType().GetRuntimeMethods().FirstOrDefault(x => x.Name == methodName);
+            if (!reference.TryGetTarget(out var instance) || instance is null)
+                return null;
 
-            if (method != null)
+            var method = GetFirstMethodWithName(instance.GetType(), methodName);
+
+            if (method is not null)
             {
-                if (method.GetParameters().Length + (method.ReturnType == typeof(void) ? 0 : 1) > 8)
-                {
-                    var exception = new ArgumentException("Cannot create a binding accessor for a method with more than 8 parameters or more than 7 parameters if it has a non-void return type.", nameof(methodName));
-                    return new PropertyError(new BindingNotification(exception, BindingErrorType.Error));
-                }
-
                 return new Accessor(reference, method);
             }
             else
@@ -35,41 +34,84 @@ namespace Avalonia.Data.Core.Plugins
             }
         }
 
-        private class Accessor : PropertyAccessorBase
+        private MethodInfo? GetFirstMethodWithName(Type type, string methodName)
         {
-            public Accessor(WeakReference reference, MethodInfo method)
-            {
-                Contract.Requires<ArgumentNullException>(reference != null);
-                Contract.Requires<ArgumentNullException>(method != null);
+            var key = (type, methodName);
 
-                var paramTypes = method.GetParameters().Select(param => param.ParameterType).ToArray();
-                var returnType = method.ReturnType;
-                
-                if (returnType == typeof(void))
-                {
-                    if (paramTypes.Length == 0)
-                    {
-                        PropertyType = typeof(Action);
-                    }
-                    else
-                    {
-                        PropertyType = Type.GetType($"System.Action`{paramTypes.Length}").MakeGenericType(paramTypes); 
-                    }
-                }
-                else
-                {
-                    var genericTypeParameters = paramTypes.Concat(new[] { returnType }).ToArray();
-                    PropertyType = Type.GetType($"System.Func`{genericTypeParameters.Length}").MakeGenericType(genericTypeParameters);
-                }
-                
-                Value = method.IsStatic ? method.CreateDelegate(PropertyType) : method.CreateDelegate(PropertyType, reference.Target);
+            if (!_methodLookup.TryGetValue(key, out var methodInfo))
+            {
+                methodInfo = TryFindAndCacheMethod(type, methodName);
             }
 
-            public override Type PropertyType { get; }
+            return methodInfo;
+        }
 
-            public override object Value { get; }
+        private MethodInfo? TryFindAndCacheMethod(Type type, string methodName)
+        {
+            MethodInfo? found = null;
 
-            public override bool SetValue(object value, BindingPriority priority) => false;
+            const BindingFlags bindingFlags =
+                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance;
+
+            var methods = type.GetMethods(bindingFlags);
+
+            foreach (MethodInfo methodInfo in methods)
+            {
+                if (methodInfo.Name == methodName)
+                {
+                    found = methodInfo;
+
+                    break;
+                }
+            }
+
+            _methodLookup.Add((type, methodName), found);
+
+            return found;
+        }
+
+        private sealed class Accessor : PropertyAccessorBase
+        {
+            public Accessor(WeakReference<object?> reference, MethodInfo method)
+            {
+                _ = reference ?? throw new ArgumentNullException(nameof(reference));
+                _ = method ?? throw new ArgumentNullException(nameof(method));
+
+                var returnType = method.ReturnType;
+
+                var parameters = method.GetParameters();
+
+                var signatureTypeCount = parameters.Length + 1;
+
+                var paramTypes = new Type[signatureTypeCount];
+
+
+                for (var i = 0; i < parameters.Length; i++)
+                {
+                    ParameterInfo parameter = parameters[i];
+
+                    paramTypes[i] = parameter.ParameterType;
+                }
+
+                paramTypes[paramTypes.Length - 1] = returnType;
+
+                PropertyType = Expression.GetDelegateType(paramTypes);
+
+                if (method.IsStatic)
+                {
+                    Value = method.CreateDelegate(PropertyType);
+                }
+                else if (reference.TryGetTarget(out var target))
+                {
+                    Value = method.CreateDelegate(PropertyType, target);
+                }
+            }
+
+            public override Type? PropertyType { get; }
+
+            public override object? Value { get; }
+
+            public override bool SetValue(object? value, BindingPriority priority) => false;
 
             protected override void SubscribeCore()
             {

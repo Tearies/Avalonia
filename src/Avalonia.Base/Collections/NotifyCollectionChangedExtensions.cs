@@ -1,7 +1,4 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using System;
+﻿using System;
 using System.Collections.Specialized;
 using System.Reactive.Linq;
 using Avalonia.Reactive;
@@ -19,7 +16,7 @@ namespace Avalonia.Collections
         public static IObservable<NotifyCollectionChangedEventArgs> GetWeakCollectionChangedObservable(
             this INotifyCollectionChanged collection)
         {
-            Contract.Requires<ArgumentNullException>(collection != null);
+            _ = collection ?? throw new ArgumentNullException(nameof(collection));
 
             return new WeakCollectionChangedObservable(new WeakReference<INotifyCollectionChanged>(collection));
         }
@@ -36,8 +33,8 @@ namespace Avalonia.Collections
             this INotifyCollectionChanged collection, 
             NotifyCollectionChangedEventHandler handler)
         {
-            Contract.Requires<ArgumentNullException>(collection != null);
-            Contract.Requires<ArgumentNullException>(handler != null);
+            _ = collection ?? throw new ArgumentNullException(nameof(collection));
+            _ = handler ?? throw new ArgumentNullException(nameof(handler));
 
             return collection.GetWeakCollectionChangedObservable()
                 .Subscribe(e => handler(collection, e));
@@ -55,14 +52,14 @@ namespace Avalonia.Collections
             this INotifyCollectionChanged collection,
             Action<NotifyCollectionChangedEventArgs> handler)
         {
-            Contract.Requires<ArgumentNullException>(collection != null);
-            Contract.Requires<ArgumentNullException>(handler != null);
+            _ = collection ?? throw new ArgumentNullException(nameof(collection));
+            _ = handler ?? throw new ArgumentNullException(nameof(handler));
 
             return collection.GetWeakCollectionChangedObservable().Subscribe(handler);
         }
 
         private class WeakCollectionChangedObservable : LightweightObservableBase<NotifyCollectionChangedEventArgs>,
-            IWeakSubscriber<NotifyCollectionChangedEventArgs>
+            IWeakEventSubscriber<NotifyCollectionChangedEventArgs>
         {
             private WeakReference<INotifyCollectionChanged> _sourceReference;
 
@@ -71,31 +68,22 @@ namespace Avalonia.Collections
                 _sourceReference = source;
             }
 
-            public void OnEvent(object sender, NotifyCollectionChangedEventArgs e)
+            public void OnEvent(object? sender,
+                WeakEvent ev,
+                NotifyCollectionChangedEventArgs e)
             {
                 PublishNext(e);
             }
-
             protected override void Initialize()
             {
-                if (_sourceReference.TryGetTarget(out INotifyCollectionChanged instance))
-                {
-                    WeakSubscriptionManager.Subscribe(
-                    instance,
-                    nameof(instance.CollectionChanged),
-                    this);
-                }
+                if (_sourceReference.TryGetTarget(out var instance))
+                    WeakEvents.CollectionChanged.Subscribe(instance, this);
             }
 
             protected override void Deinitialize()
             {
-                if (_sourceReference.TryGetTarget(out INotifyCollectionChanged instance))
-                {
-                    WeakSubscriptionManager.Unsubscribe(
-                        instance,
-                        nameof(instance.CollectionChanged),
-                        this);
-                }
+                if (_sourceReference.TryGetTarget(out var instance))
+                    WeakEvents.CollectionChanged.Unsubscribe(instance, this);
             }
         }
     }

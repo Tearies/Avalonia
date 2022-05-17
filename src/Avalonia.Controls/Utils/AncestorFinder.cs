@@ -1,10 +1,8 @@
 using System;
-using System.Linq;
 using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using System.Reflection;
 
 namespace Avalonia.Controls.Utils
 {
@@ -13,14 +11,14 @@ namespace Avalonia.Controls.Utils
         class FinderNode : IDisposable
         {
             private readonly IStyledElement _control;
-            private readonly TypeInfo _ancestorType;
-            public IObservable<IStyledElement> Observable => _subject;
-            private readonly Subject<IStyledElement> _subject = new Subject<IStyledElement>();
+            private readonly Type _ancestorType;
+            public IObservable<IStyledElement?> Observable => _subject;
+            private readonly Subject<IStyledElement?> _subject = new Subject<IStyledElement?>();
 
-            private FinderNode _child;
-            private IDisposable _disposable;
+            private FinderNode? _child;
+            private IDisposable? _disposable;
 
-            public FinderNode(IStyledElement control, TypeInfo ancestorType)
+            public FinderNode(IStyledElement control, Type ancestorType)
             {
                 _control = control;
                 _ancestorType = ancestorType;
@@ -31,9 +29,9 @@ namespace Avalonia.Controls.Utils
                 _disposable = _control.GetObservable(Control.ParentProperty).Subscribe(OnValueChanged);
             }
 
-            private void OnValueChanged(IStyledElement next)
+            private void OnValueChanged(IStyledElement? next)
             {
-                if (next == null || _ancestorType.IsAssignableFrom(next.GetType().GetTypeInfo()))
+                if (next == null || _ancestorType.IsAssignableFrom(next.GetType()))
                     _subject.OnNext(next);
                 else
                 {
@@ -44,26 +42,28 @@ namespace Avalonia.Controls.Utils
                 }
             }
 
-            private void OnChildValueChanged(IStyledElement control) => _subject.OnNext(control);
+            private void OnChildValueChanged(IStyledElement? control) => _subject.OnNext(control);
 
 
             public void Dispose()
             {
-                _disposable.Dispose();
+                _child?.Dispose();
+                _subject.Dispose();
+                _disposable?.Dispose();
             }
         }
 
-        public static IObservable<T> Create<T>(IStyledElement control)
+        public static IObservable<T?> Create<T>(IStyledElement control)
             where T : IStyledElement
         {
-            return Create(control, typeof(T)).Cast<T>();
+            return Create(control, typeof(T)).Select(x => (T?)x);
         }
 
-        public static IObservable<IStyledElement> Create(IStyledElement control, Type ancestorType)
+        public static IObservable<IStyledElement?> Create(IStyledElement control, Type ancestorType)
         {
-            return new AnonymousObservable<IStyledElement>(observer =>
+            return new AnonymousObservable<IStyledElement?>(observer =>
             {
-                var finder = new FinderNode(control, ancestorType.GetTypeInfo());
+                var finder = new FinderNode(control, ancestorType);
                 var subscription = finder.Observable.Subscribe(observer);
                 finder.Init();
 

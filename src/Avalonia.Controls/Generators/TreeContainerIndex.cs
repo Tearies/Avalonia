@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,18 +15,19 @@ namespace Avalonia.Controls.Generators
     /// </remarks>
     public class TreeContainerIndex
     {
+        private readonly Dictionary<object, HashSet<IControl>> _itemToContainerSet = new Dictionary<object, HashSet<IControl>>();
         private readonly Dictionary<object, IControl> _itemToContainer = new Dictionary<object, IControl>();
         private readonly Dictionary<IControl, object> _containerToItem = new Dictionary<IControl, object>();
 
         /// <summary>
         /// Signaled whenever new containers are materialized.
         /// </summary>
-        public event EventHandler<ItemContainerEventArgs> Materialized;
+        public event EventHandler<ItemContainerEventArgs>? Materialized;
 
         /// <summary>
         /// Event raised whenever containers are dematerialized.
         /// </summary>
-        public event EventHandler<ItemContainerEventArgs> Dematerialized;
+        public event EventHandler<ItemContainerEventArgs>? Dematerialized;
 
         /// <summary>
         /// Gets the currently materialized containers.
@@ -48,14 +46,45 @@ namespace Avalonia.Controls.Generators
         /// <param name="container">The item container.</param>
         public void Add(object item, IControl container)
         {
-            _itemToContainer.Add(item, container);
+            _itemToContainer[item] = container;
+            if (_itemToContainerSet.TryGetValue(item, out var set))
+            {
+                set.Add(container);
+            }
+            else
+            {
+                _itemToContainerSet.Add(item, new HashSet<IControl> { container });
+            }
+
             _containerToItem.Add(container, item);
 
             Materialized?.Invoke(
-                this, 
+                this,
                 new ItemContainerEventArgs(new ItemContainerInfo(container, item, 0)));
         }
 
+        /// <summary>
+        /// Removes a container from private collections.
+        /// </summary>
+        /// <param name="container">The item container.</param>
+        /// <param name="item">The DataContext object</param>
+        private void RemoveContainer(IControl container, object item)
+        {
+            if (_itemToContainerSet.TryGetValue(item, out var set))
+            {
+                set.Remove(container);
+                if (set.Count == 0)
+                {
+                    _itemToContainerSet.Remove(item);
+                    _itemToContainer.Remove(item);
+                }
+                else
+                {
+                    _itemToContainer[item] = set.First();
+                }
+            }
+        }
+        
         /// <summary>
         /// Removes a container from the index.
         /// </summary>
@@ -64,10 +93,10 @@ namespace Avalonia.Controls.Generators
         {
             var item = _containerToItem[container];
             _containerToItem.Remove(container);
-            _itemToContainer.Remove(item);
+            RemoveContainer(container, item);
 
             Dematerialized?.Invoke(
-                this, 
+                this,
                 new ItemContainerEventArgs(new ItemContainerInfo(container, item, 0)));
         }
 
@@ -82,7 +111,7 @@ namespace Avalonia.Controls.Generators
             {
                 var item = _containerToItem[container.ContainerControl];
                 _containerToItem.Remove(container.ContainerControl);
-                _itemToContainer.Remove(item);
+                RemoveContainer(container.ContainerControl, item);
             }
 
             Dematerialized?.Invoke(
@@ -95,11 +124,23 @@ namespace Avalonia.Controls.Generators
         /// </summary>
         /// <param name="item">The item.</param>
         /// <returns>The container, or null of not found.</returns>
-        public IControl ContainerFromItem(object item)
+        public IControl? ContainerFromItem(object item)
         {
-            IControl result;
-            _itemToContainer.TryGetValue(item, out result);
-            return result;
+            if (item != null)
+            {
+                _itemToContainer.TryGetValue(item, out var result);
+                if (result == null)
+                {
+                    _itemToContainerSet.TryGetValue(item, out var set);
+                    if (set?.Count > 0)
+                    {
+                        return set.FirstOrDefault();
+                    }
+                }
+                return result;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -107,11 +148,19 @@ namespace Avalonia.Controls.Generators
         /// </summary>
         /// <param name="container">The container.</param>
         /// <returns>The item, or null of not found.</returns>
-        public object ItemFromContainer(IControl container)
+        public object? ItemFromContainer(IControl? container)
         {
-            object result;
-            _containerToItem.TryGetValue(container, out result);
-            return result;
+            if (container != null)
+            {
+                _containerToItem.TryGetValue(container, out var result);
+                if (result != null)
+                {
+                    _itemToContainer[result] = container;
+                }
+                return result;
+            }
+
+            return null;
         }
     }
 }

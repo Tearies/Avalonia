@@ -1,6 +1,4 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
+using System;
 using Avalonia.Controls.Primitives;
 using Avalonia.Styling;
 
@@ -13,18 +11,16 @@ namespace Avalonia.Controls.Templates
     {
     }
 
-    public class ControlTemplateResult
+    public class ControlTemplateResult : TemplateResult<IControl>
     {
         public IControl Control { get; }
-        public INameScope NameScope { get; }
 
-        public ControlTemplateResult(IControl control, INameScope nameScope)
+        public ControlTemplateResult(IControl control, INameScope nameScope) : base(control, nameScope)
         {
             Control = control;
-            NameScope = nameScope;
         }
 
-        public void Deconstruct(out IControl control, out INameScope scope)
+        public new void Deconstruct(out IControl control, out INameScope scope)
         {
             control = Control;
             scope = NameScope;

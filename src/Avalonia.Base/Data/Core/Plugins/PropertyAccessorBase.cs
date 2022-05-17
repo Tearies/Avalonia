@@ -1,7 +1,4 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using System;
+﻿using System;
 
 namespace Avalonia.Data.Core.Plugins
 {
@@ -10,13 +7,13 @@ namespace Avalonia.Data.Core.Plugins
     /// </summary>
     public abstract class PropertyAccessorBase : IPropertyAccessor
     {
-        private Action<object> _listener;
+        private Action<object?>? _listener;
 
         /// <inheritdoc/>
-        public abstract Type PropertyType { get; }
+        public abstract Type? PropertyType { get; }
 
         /// <inheritdoc/>
-        public abstract object Value { get; }
+        public abstract object? Value { get; }
 
         /// <inheritdoc/>
         public void Dispose()
@@ -28,12 +25,12 @@ namespace Avalonia.Data.Core.Plugins
         }
 
         /// <inheritdoc/>
-        public abstract bool SetValue(object value, BindingPriority priority);
+        public abstract bool SetValue(object? value, BindingPriority priority);
 
         /// <inheritdoc/>
-        public void Subscribe(Action<object> listener)
+        public void Subscribe(Action<object?> listener)
         {
-            Contract.Requires<ArgumentNullException>(listener != null);
+            _ = listener ?? throw new ArgumentNullException(nameof(listener));
 
             if (_listener != null)
             {
@@ -61,7 +58,7 @@ namespace Avalonia.Data.Core.Plugins
         /// Publishes a value to the listener.
         /// </summary>
         /// <param name="value">The value.</param>
-        protected void PublishValue(object value) => _listener?.Invoke(value);
+        protected void PublishValue(object? value) => _listener?.Invoke(value);
 
         /// <summary>
         /// When overridden in a derived class, begins listening to the member.

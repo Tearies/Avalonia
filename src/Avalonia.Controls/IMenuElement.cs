@@ -11,7 +11,7 @@ namespace Avalonia.Controls
         /// <summary>
         /// Gets or sets the currently selected submenu item.
         /// </summary>
-        IMenuItem SelectedItem { get; set; }
+        IMenuItem? SelectedItem { get; set; }
 
         /// <summary>
         /// Gets the submenu items.

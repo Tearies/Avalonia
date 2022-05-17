@@ -1,7 +1,6 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
+using System.Threading;
+
 using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Styling;
@@ -11,25 +10,28 @@ namespace Avalonia.ReactiveUI
     /// <summary>
     /// A ContentControl that animates the transition when its content is changed.
     /// </summary>
+    [Obsolete("Use TransitioningContentControl in Avalonia.Controls namespace")]
     public class TransitioningContentControl : ContentControl, IStyleable
     {
         /// <summary>
         /// <see cref="AvaloniaProperty"/> for the <see cref="PageTransition"/> property.
         /// </summary>
-        public static readonly AvaloniaProperty<IPageTransition> PageTransitionProperty =
-            AvaloniaProperty.Register<TransitioningContentControl, IPageTransition>(nameof(PageTransition),
+        public static readonly StyledProperty<IPageTransition?> PageTransitionProperty =
+            AvaloniaProperty.Register<TransitioningContentControl, IPageTransition?>(nameof(PageTransition),
                 new CrossFade(TimeSpan.FromSeconds(0.5)));
 
         /// <summary>
         /// <see cref="AvaloniaProperty"/> for the <see cref="DefaultContent"/> property.
         /// </summary>
-        public static readonly AvaloniaProperty<object> DefaultContentProperty =
-            AvaloniaProperty.Register<TransitioningContentControl, object>(nameof(DefaultContent));
-        
+        public static readonly StyledProperty<object?> DefaultContentProperty =
+            AvaloniaProperty.Register<TransitioningContentControl, object?>(nameof(DefaultContent));
+
+        private CancellationTokenSource? _lastTransitionCts;
+
         /// <summary>
         /// Gets or sets the animation played when content appears and disappears.
         /// </summary>
-        public IPageTransition PageTransition
+        public IPageTransition? PageTransition
         {
             get => GetValue(PageTransitionProperty);
             set => SetValue(PageTransitionProperty, value);
@@ -38,7 +40,7 @@ namespace Avalonia.ReactiveUI
         /// <summary>
         /// Gets or sets the content displayed whenever there is no page currently routed.
         /// </summary>
-        public object DefaultContent
+        public object? DefaultContent
         {
             get => GetValue(DefaultContentProperty);
             set => SetValue(DefaultContentProperty, value);
@@ -47,7 +49,7 @@ namespace Avalonia.ReactiveUI
         /// <summary>
         /// Gets or sets the content with animation.
         /// </summary>
-        public new object Content
+        public new object? Content
         {
             get => base.Content;
             set => UpdateContentWithTransition(value);
@@ -63,13 +65,16 @@ namespace Avalonia.ReactiveUI
         /// Updates the content with transitions.
         /// </summary>
         /// <param name="content">New content to set.</param>
-        private async void UpdateContentWithTransition(object content)
+        private async void UpdateContentWithTransition(object? content)
         {
+            _lastTransitionCts?.Cancel();
+            _lastTransitionCts = new CancellationTokenSource();
+
             if (PageTransition != null)
-                await PageTransition.Start(this, null, true);
+                await PageTransition.Start(this, null, true, _lastTransitionCts.Token);
             base.Content = content;
             if (PageTransition != null)
-                await PageTransition.Start(null, this, true);
+                await PageTransition.Start(null, this, true, _lastTransitionCts.Token);
         }
     }
 }

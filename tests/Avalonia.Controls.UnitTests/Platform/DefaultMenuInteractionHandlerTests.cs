@@ -1,5 +1,6 @@
 ﻿using System;
 using Avalonia.Controls.Platform;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
@@ -18,7 +19,9 @@ namespace Avalonia.Controls.UnitTests.Platform
             default);
         
         static PointerReleasedEventArgs CreateReleased(IInteractive source) => new PointerReleasedEventArgs(source,
-            new FakePointer(), (IVisual)source, default,0, new PointerPointProperties(RawInputModifiers.None, PointerUpdateKind.LeftButtonReleased), default);
+            new FakePointer(), (IVisual)source, default,0,
+            new PointerPointProperties(RawInputModifiers.None, PointerUpdateKind.LeftButtonReleased),
+            default, MouseButton.Left);
         
         public class TopLevel
         {
@@ -46,6 +49,19 @@ namespace Avalonia.Controls.UnitTests.Platform
                 target.KeyDown(item, e);
 
                 Mock.Get(item).Verify(x => x.Open());
+                Mock.Get(item).Verify(x => x.MoveSelection(NavigationDirection.First, true));
+                Assert.True(e.Handled);
+            }
+
+            [Fact]
+            public void Down_Selects_First_Item_Of_Already_Opened_Submenu()
+            {
+                var target = new DefaultMenuInteractionHandler(false);
+                var item = Mock.Of<IMenuItem>(x => x.IsTopLevel == true && x.HasSubMenu == true && x.IsSubMenuOpen);
+                var e = new KeyEventArgs { Key = Key.Down, Source = item };
+
+                target.KeyDown(item, e);
+
                 Mock.Get(item).Verify(x => x.MoveSelection(NavigationDirection.First, true));
                 Assert.True(e.Handled);
             }
@@ -123,6 +139,24 @@ namespace Avalonia.Controls.UnitTests.Platform
             }
 
             [Fact]
+            public void Click_On_TopLevel_Calls_MainMenu_Open()
+            {
+                var target = new DefaultMenuInteractionHandler(false);
+                var menu = new Mock<IMainMenu>();
+                menu.As<IMenuElement>();
+
+                var item = Mock.Of<IMenuItem>(x =>
+                    x.IsTopLevel == true &&
+                    x.HasSubMenu == true &&
+                    x.Parent == menu.Object);
+
+                var e = CreatePressed(item);
+
+                target.PointerPressed(item, e);
+                menu.Verify(x => x.Open());
+            }
+
+            [Fact]
             public void Click_On_Open_TopLevel_Menu_Closes_Menu()
             {
                 var target = new DefaultMenuInteractionHandler(false);
@@ -196,6 +230,18 @@ namespace Avalonia.Controls.UnitTests.Platform
 
                 menu.VerifySet(x => x.SelectedItem = null, Times.Never);
                 Assert.False(e.Handled);
+            }
+
+            [Fact]
+            public void Doesnt_Throw_On_Menu_Keypress()
+            {
+                // Issue #3459
+                var target = new DefaultMenuInteractionHandler(false);
+                var menu = Mock.Of<IMenu>();
+                var item = Mock.Of<IMenuItem>(x => x.IsTopLevel == true && x.Parent == menu);
+                var e = new KeyEventArgs { Key = Key.Tab, Source = menu };
+
+                target.KeyDown(menu, e);
             }
         }
 
@@ -471,26 +517,26 @@ namespace Avalonia.Controls.UnitTests.Platform
                 target.PointerEnter(item, enter);
                 Assert.True(timer.ActionIsQueued);
                 Mock.Get(parentItem).VerifySet(x => x.SelectedItem = item);
-                Mock.Get(parentItem).ResetCalls();
+                Mock.Get(parentItem).Invocations.Clear();
 
                 // SubMenu shown after a delay.
                 timer.Pulse();
                 Mock.Get(item).Verify(x => x.Open());
                 Mock.Get(item).SetupGet(x => x.IsSubMenuOpen).Returns(true);
-                Mock.Get(item).ResetCalls();
+                Mock.Get(item).Invocations.Clear();
 
                 // Pointer briefly exits item, but submenu remains open.
                 target.PointerLeave(item, leave);
                 Mock.Get(item).Verify(x => x.Close(), Times.Never);
-                Mock.Get(item).ResetCalls();
+                Mock.Get(item).Invocations.Clear();
 
                 // Pointer enters child item; is selected.
                 enter.Source = childItem;
                 target.PointerEnter(childItem, enter);
                 Mock.Get(item).VerifySet(x => x.SelectedItem = childItem);
                 Mock.Get(parentItem).VerifySet(x => x.SelectedItem = item);
-                Mock.Get(item).ResetCalls();
-                Mock.Get(parentItem).ResetCalls();
+                Mock.Get(item).Invocations.Clear();
+                Mock.Get(parentItem).Invocations.Clear();
             }
 
             [Fact]
@@ -506,6 +552,22 @@ namespace Avalonia.Controls.UnitTests.Platform
 
                 Mock.Get(item).Verify(x => x.Open());
                 Mock.Get(item).Verify(x => x.MoveSelection(NavigationDirection.First, true), Times.Never);
+                Assert.True(e.Handled);
+            }
+
+            [Fact]
+            public void PointerPressed_On_Disabled_Item_Doesnt_Close_SubMenu()
+            {
+                var target = new DefaultMenuInteractionHandler(false);
+                var menu = Mock.Of<IMenu>();
+                var parentItem = Mock.Of<IMenuItem>(x => x.IsTopLevel == true && x.HasSubMenu == true && x.IsSubMenuOpen == true && x.Parent == menu);
+                var popup = new Popup();
+                var e = CreatePressed(popup);
+                
+                ((ISetLogicalParent)popup).SetParent(parentItem);
+                target.PointerPressed(parentItem, e);
+
+                Mock.Get(parentItem).Verify(x => x.Close(), Times.Never);
                 Assert.True(e.Handled);
             }
         }

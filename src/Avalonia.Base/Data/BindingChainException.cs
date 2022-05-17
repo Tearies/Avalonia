@@ -1,7 +1,4 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using System;
+﻿using System;
 
 namespace Avalonia.Data
 {
@@ -19,6 +16,7 @@ namespace Avalonia.Data
         /// </summary>
         public BindingChainException()
         {
+            _message = "Binding error";
         }
 
         /// <summary>
@@ -48,12 +46,12 @@ namespace Avalonia.Data
         /// <summary>
         /// Gets the expression that could not be evaluated.
         /// </summary>
-        public string Expression { get; protected set; }
+        public string? Expression { get; protected set; }
 
         /// <summary>
         /// Gets the point in the expression at which the error occurred.
         /// </summary>
-        public string ExpressionErrorPoint { get; protected set; }
+        public string? ExpressionErrorPoint { get; protected set; }
 
         /// <inheritdoc/>
         public override string Message

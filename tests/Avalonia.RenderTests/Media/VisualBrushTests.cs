@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
@@ -45,13 +42,11 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                             BorderThickness = new Thickness(2),
                             HorizontalAlignment = HorizontalAlignment.Center,
                             VerticalAlignment = VerticalAlignment.Center,
-                            Child = new TextBlock
+                            Child = new Panel
                             {
-                                FontSize = 24,
-                                FontFamily = new FontFamily("Arial"),
-                                Background = Brushes.Green,
-                                Foreground = Brushes.Yellow,
-                                Text = "VisualBrush",
+                                Height = 26,
+                                Width = 150,
+                                Background = Brushes.Green
                             }
                         }
                     }
@@ -84,11 +79,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
             CompareImages();
         }
 
-#if AVALONIA_SKIA_SKIP_FAIL
-        [Fact(Skip = "FIXME")]
-#else
         [Fact]
-#endif
         public async Task VisualBrush_NoStretch_NoTile_Alignment_Center()
         {
             Decorator target = new Decorator
@@ -138,11 +129,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
             CompareImages();
         }
 
-#if AVALONIA_SKIA_SKIP_FAIL
-        [Fact(Skip = "FIXME")]
-#else
         [Fact]
-#endif
         public async Task VisualBrush_Fill_NoTile()
         {
             Decorator target = new Decorator
@@ -165,11 +152,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
             CompareImages();
         }
 
-#if AVALONIA_SKIA_SKIP_FAIL
-        [Fact(Skip = "FIXME")]
-#else
         [Fact]
-#endif
         public async Task VisualBrush_Uniform_NoTile()
         {
             Decorator target = new Decorator
@@ -192,11 +175,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
             CompareImages();
         }
 
-#if AVALONIA_SKIA_SKIP_FAIL
-        [Fact(Skip = "FIXME")]
-#else
         [Fact]
-#endif
         public async Task VisualBrush_UniformToFill_NoTile()
         {
             Decorator target = new Decorator
@@ -243,11 +222,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
             CompareImages();
         }
 
-#if AVALONIA_SKIA_SKIP_FAIL
-        [Fact(Skip = "FIXME")]
-#else
         [Fact]
-#endif
         public async Task VisualBrush_NoStretch_NoTile_BottomRightQuarterDest()
         {
             Decorator target = new Decorator
@@ -321,11 +296,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
             CompareImages();
         }
 
-#if AVALONIA_SKIA_SKIP_FAIL
-        [Fact(Skip = "FIXME")]
-#else
         [Fact]
-#endif
         public async Task VisualBrush_NoStretch_FlipX_TopLeftDest()
         {
             Decorator target = new Decorator
@@ -349,11 +320,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
             CompareImages();
         }
 
-#if AVALONIA_SKIA_SKIP_FAIL
-        [Fact(Skip = "FIXME")]
-#else
         [Fact]
-#endif
         public async Task VisualBrush_NoStretch_FlipY_TopLeftDest()
         {
             Decorator target = new Decorator
@@ -377,11 +344,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
             CompareImages();
         }
 
-#if AVALONIA_SKIA_SKIP_FAIL
-        [Fact(Skip = "FIXME")]
-#else
         [Fact]
-#endif
         public async Task VisualBrush_NoStretch_FlipXY_TopLeftDest()
         {
             Decorator target = new Decorator
@@ -405,11 +368,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
             CompareImages();
         }
 
-#if AVALONIA_SKIA_SKIP_FAIL
-        [Fact(Skip = "FIXME")]
-#else
         [Fact]
-#endif
         public async Task VisualBrush_InTree_Visual()
         {
             Border source;
@@ -427,10 +386,10 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                         {
                             Background = Brushes.Yellow,
                             HorizontalAlignment = HorizontalAlignment.Left,
-                            Child = new TextBlock
+                            Child = new Panel
                             {
-                                FontFamily = new FontFamily("Courier New"),
-                                Text = "Visual"
+                                Height = 10,
+                                Width = 50
                             }
                         }),
                         new Border

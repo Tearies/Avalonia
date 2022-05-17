@@ -1,7 +1,6 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
+
+using Avalonia.Utilities;
 
 namespace Avalonia.Controls.Templates
 {
@@ -18,8 +17,8 @@ namespace Avalonia.Controls.Templates
         /// A function which when passed an object of <typeparamref name="T"/> returns a control.
         /// </param>
         /// <param name="supportsRecycling">Whether the control can be recycled.</param>
-        public FuncDataTemplate(Func<T, INameScope, IControl> build, bool supportsRecycling = false)
-            : base(typeof(T), CastBuild(build), supportsRecycling)
+        public FuncDataTemplate(Func<T, INameScope, IControl?> build, bool supportsRecycling = false)
+            : base(o => TypeUtilities.CanCast<T>(o), CastBuild(build), supportsRecycling)
         {
         }
 
@@ -64,9 +63,9 @@ namespace Avalonia.Controls.Templates
         /// </summary>
         /// <param name="f">The strongly typed function.</param>
         /// <returns>The weakly typed function.</returns>
-        private static Func<object, bool> CastMatch(Func<T, bool> f)
+        private static Func<object?, bool> CastMatch(Func<T, bool> f)
         {
-            return o => (o is T) && f((T)o);
+            return o => TypeUtilities.CanCast<T>(o) && f((T)o!);
         }
 
         /// <summary>
@@ -75,9 +74,9 @@ namespace Avalonia.Controls.Templates
         /// <typeparam name="TResult">The strong data type.</typeparam>
         /// <param name="f">The strongly typed function.</param>
         /// <returns>The weakly typed function.</returns>
-        private static Func<object, INameScope, TResult> CastBuild<TResult>(Func<T, INameScope, TResult> f)
+        private static Func<object?, INameScope, TResult> CastBuild<TResult>(Func<T, INameScope, TResult> f)
         {
-            return (o, s) => f((T)o, s);
+            return (o, s) => f((T)o!, s);
         }
     }
 }

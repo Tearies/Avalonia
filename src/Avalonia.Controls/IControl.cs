@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -18,6 +15,6 @@ namespace Avalonia.Controls
         INamed,
         IStyledElement
     {
-        new IControl Parent { get; }
+        new IControl? Parent { get; }
     }
 }

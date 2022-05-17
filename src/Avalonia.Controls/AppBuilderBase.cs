@@ -1,7 +1,5 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -16,8 +14,10 @@ namespace Avalonia.Controls
     public abstract class AppBuilderBase<TAppBuilder> where TAppBuilder : AppBuilderBase<TAppBuilder>, new()
     {
         private static bool s_setupWasAlreadyCalled;
-        private Action _optionsInitializers;
-
+        private Action? _optionsInitializers;
+        private Func<Application>? _appFactory;
+        private IApplicationLifetime? _lifetime;
+        
         /// <summary>
         /// Gets or sets the <see cref="IRuntimePlatform"/> instance.
         /// </summary>
@@ -29,29 +29,34 @@ namespace Avalonia.Controls
         public Action RuntimePlatformServicesInitializer { get; private set; }
 
         /// <summary>
-        /// Gets or sets the <see cref="Application"/> instance being initialized.
+        /// Gets the <see cref="Application"/> instance being initialized.
         /// </summary>
-        public Application Instance { get; protected set; }
-
+        public Application? Instance { get; private set; }
+        
+        /// <summary>
+        /// Gets the type of the Instance (even if it's not created yet)
+        /// </summary>
+        public Type? ApplicationType { get; private set; }
+        
         /// <summary>
         /// Gets or sets a method to call the initialize the windowing subsystem.
         /// </summary>
-        public Action WindowingSubsystemInitializer { get; private set; }
+        public Action? WindowingSubsystemInitializer { get; private set; }
 
         /// <summary>
         /// Gets the name of the currently selected windowing subsystem.
         /// </summary>
-        public string WindowingSubsystemName { get; private set; }
+        public string? WindowingSubsystemName { get; private set; }
 
         /// <summary>
         /// Gets or sets a method to call the initialize the windowing subsystem.
         /// </summary>
-        public Action RenderingSubsystemInitializer { get; private set; }
+        public Action? RenderingSubsystemInitializer { get; private set; }
 
         /// <summary>
         /// Gets the name of the currently selected rendering subsystem.
         /// </summary>
-        public string RenderingSubsystemName { get; private set; }
+        public string? RenderingSubsystemName { get; private set; }
 
         /// <summary>
         /// Gets or sets a method to call after the <see cref="Application"/> is setup.
@@ -59,6 +64,8 @@ namespace Avalonia.Controls
         public Action<TAppBuilder> AfterSetupCallback { get; private set; } = builder => { };
 
 
+        public Action<TAppBuilder> AfterPlatformServicesSetupCallback { get; private set; } = builder => { };
+        
         protected AppBuilderBase(IRuntimePlatform platform, Action<TAppBuilder> platformServices)
         {
             RuntimePlatform = platform;
@@ -73,20 +80,28 @@ namespace Avalonia.Controls
         public static TAppBuilder Configure<TApp>()
             where TApp : Application, new()
         {
-            return Configure(new TApp());
+            return new TAppBuilder()
+            {
+                ApplicationType = typeof(TApp),
+                // Needed for CoreRT compatibility
+                _appFactory = () => new TApp()
+            };
         }
 
         /// <summary>
         /// Begin configuring an <see cref="Application"/>.
         /// </summary>
+        /// <param name="appFactory">Factory function for <typeparamref name="TApp"/>.</param>
+        /// <typeparam name="TApp">The subclass of <see cref="Application"/> to configure.</typeparam>
+        /// <remarks><paramref name="appFactory"/> is useful for passing of dependencies to <typeparamref name="TApp"/>.</remarks>
         /// <returns>An <typeparamref name="TAppBuilder"/> instance.</returns>
-        public static TAppBuilder Configure(Application app)
+        public static TAppBuilder Configure<TApp>(Func<TApp> appFactory)
+            where TApp : Application
         {
-            AvaloniaLocator.CurrentMutable.BindToSelf(app);
-
             return new TAppBuilder()
             {
-                Instance = app,
+                ApplicationType = typeof(TApp),
+                _appFactory = appFactory
             };
         }
 
@@ -97,6 +112,13 @@ namespace Avalonia.Controls
             AfterSetupCallback = (Action<TAppBuilder>)Delegate.Combine(AfterSetupCallback, callback);
             return Self;
         }
+        
+        
+        public TAppBuilder AfterPlatformServicesSetup(Action<TAppBuilder> callback)
+        {
+            AfterPlatformServicesSetupCallback = (Action<TAppBuilder>)Delegate.Combine(AfterPlatformServicesSetupCallback, callback);
+            return Self;
+        }
 
         /// <summary>
         /// Starts the application with an instance of <typeparamref name="TMainWindow"/>.
@@ -104,7 +126,7 @@ namespace Avalonia.Controls
         /// <typeparam name="TMainWindow">The window type.</typeparam>
         /// <param name="dataContextProvider">A delegate that will be called to create a data context for the window (optional).</param>
         [Obsolete("Use either lifetimes or AppMain overload. See see https://github.com/AvaloniaUI/Avalonia/wiki/Application-lifetimes for details")]
-        public void Start<TMainWindow>(Func<object> dataContextProvider = null)
+        public void Start<TMainWindow>(Func<object>? dataContextProvider = null)
             where TMainWindow : Window, new()
         {
             AfterSetup(builder =>
@@ -112,14 +134,13 @@ namespace Avalonia.Controls
                 var window = new TMainWindow();
                 if (dataContextProvider != null)
                     window.DataContext = dataContextProvider();
-                ((IClassicDesktopStyleApplicationLifetime)builder.Instance.ApplicationLifetime)
+                ((IClassicDesktopStyleApplicationLifetime)builder.Instance!.ApplicationLifetime!)
                     .MainWindow = window;
             });
             
             // Copy-pasted because we can't call extension methods due to generic constraints
-            var lifetime = new ClassicDesktopStyleApplicationLifetime(Instance) {ShutdownMode = ShutdownMode.OnMainWindowClose};
-            Instance.ApplicationLifetime = lifetime;
-            SetupWithoutStarting();
+            var lifetime = new ClassicDesktopStyleApplicationLifetime() {ShutdownMode = ShutdownMode.OnMainWindowClose};
+            SetupWithLifetime(lifetime);
             lifetime.Start(Array.Empty<string>());
         }
 
@@ -134,7 +155,7 @@ namespace Avalonia.Controls
         public void Start(AppMainDelegate main, string[] args)
         {
             Setup();
-            main(Instance, args);
+            main(Instance!, args);
         }
 
         /// <summary>
@@ -147,6 +168,18 @@ namespace Avalonia.Controls
             return Self;
         }
 
+        /// <summary>
+        /// Sets up the platform-specific services for the application and initialized it with a particular lifetime, but does not run it.
+        /// </summary>
+        /// <param name="lifetime"></param>
+        /// <returns></returns>
+        public TAppBuilder SetupWithLifetime(IApplicationLifetime lifetime)
+        {
+            _lifetime = lifetime;
+            Setup();
+            return Self;
+        }
+        
         /// <summary>
         /// Specifies a windowing subsystem to use.
         /// </summary>
@@ -193,8 +226,8 @@ namespace Avalonia.Controls
             var platformClassName = assemblyName.Replace("Avalonia.", string.Empty) + "Platform";
             var platformClassFullName = assemblyName + "." + platformClassName;
             var platformClass = assembly.GetType(platformClassFullName);
-            var init = platformClass.GetRuntimeMethod("Initialize", Type.EmptyTypes);
-            init.Invoke(null, null);
+            var init = platformClass!.GetRuntimeMethod("Initialize", Type.EmptyTypes);
+            init!.Invoke(null, null);
         };
 
         public TAppBuilder UseAvaloniaModules() => AfterSetup(builder => SetupAvaloniaModules());
@@ -218,7 +251,7 @@ namespace Avalonia.Controls
                                              where constructor.GetParameters().Length == 0 && !constructor.IsStatic
                                              select constructor).Single() into constructor
                                      select (Action)(() => constructor.Invoke(Array.Empty<object>()));
-            Delegate.Combine(moduleInitializers.ToArray()).DynamicInvoke();
+            Delegate.Combine(moduleInitializers.ToArray())!.DynamicInvoke();
         }
 
         /// <summary>
@@ -240,15 +273,10 @@ namespace Avalonia.Controls
         }
         
         /// <summary>
-        /// Sets up the platform-speciic services for the <see cref="Application"/>.
+        /// Sets up the platform-specific services for the <see cref="Application"/>.
         /// </summary>
         private void Setup()
         {
-            if (Instance == null)
-            {
-                throw new InvalidOperationException("No App instance configured.");
-            }
-
             if (RuntimePlatformServicesInitializer == null)
             {
                 throw new InvalidOperationException("No runtime platform services configured.");
@@ -264,6 +292,11 @@ namespace Avalonia.Controls
                 throw new InvalidOperationException("No rendering system configured.");
             }
 
+            if (_appFactory == null)
+            {
+                throw new InvalidOperationException("No Application factory configured.");
+            }
+
             if (s_setupWasAlreadyCalled && CheckSetup)
             {
                 throw new InvalidOperationException("Setup was already called on one of AppBuilder instances");
@@ -274,6 +307,10 @@ namespace Avalonia.Controls
             RuntimePlatformServicesInitializer();
             WindowingSubsystemInitializer();
             RenderingSubsystemInitializer();
+            AfterPlatformServicesSetupCallback(Self);
+            Instance = _appFactory();
+            Instance.ApplicationLifetime = _lifetime;
+            AvaloniaLocator.CurrentMutable.BindToSelf(Instance);
             Instance.RegisterServices();
             Instance.Initialize();
             AfterSetupCallback(Self);

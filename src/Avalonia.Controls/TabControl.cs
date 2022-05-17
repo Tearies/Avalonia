@@ -1,22 +1,25 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
+using System.ComponentModel;
 using System.Linq;
+using Avalonia.Collections;
+using Avalonia.Automation.Peers;
 using Avalonia.Controls.Generators;
-using Avalonia.Controls.Mixins;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
+using Avalonia.Automation;
+using Avalonia.Controls.Metadata;
 
 namespace Avalonia.Controls
 {
     /// <summary>
     /// A tab control that displays a tab strip along with the content of the selected tab.
     /// </summary>
-    public class TabControl : SelectingItemsControl
+    [TemplatePart("PART_ItemsPresenter", typeof(ItemsPresenter))]
+    public class TabControl : SelectingItemsControl, IContentPresenterHost
     {
         /// <summary>
         /// Defines the <see cref="TabStripPlacement"/> property.
@@ -39,20 +42,20 @@ namespace Avalonia.Controls
         /// <summary>
         /// Defines the <see cref="ContentTemplate"/> property.
         /// </summary>
-        public static readonly StyledProperty<IDataTemplate> ContentTemplateProperty =
+        public static readonly StyledProperty<IDataTemplate?> ContentTemplateProperty =
             ContentControl.ContentTemplateProperty.AddOwner<TabControl>();
 
         /// <summary>
         /// The selected content property
         /// </summary>
-        public static readonly StyledProperty<object> SelectedContentProperty =
-            AvaloniaProperty.Register<TabControl, object>(nameof(SelectedContent));
+        public static readonly StyledProperty<object?> SelectedContentProperty =
+            AvaloniaProperty.Register<TabControl, object?>(nameof(SelectedContent));
 
         /// <summary>
         /// The selected content template property
         /// </summary>
-        public static readonly StyledProperty<IDataTemplate> SelectedContentTemplateProperty =
-            AvaloniaProperty.Register<TabControl, IDataTemplate>(nameof(SelectedContentTemplate));
+        public static readonly StyledProperty<IDataTemplate?> SelectedContentTemplateProperty =
+            AvaloniaProperty.Register<TabControl, IDataTemplate?>(nameof(SelectedContentTemplate));
 
         /// <summary>
         /// The default value for the <see cref="ItemsControl.ItemsPanel"/> property.
@@ -68,10 +71,8 @@ namespace Avalonia.Controls
             SelectionModeProperty.OverrideDefaultValue<TabControl>(SelectionMode.AlwaysSelected);
             ItemsPanelProperty.OverrideDefaultValue<TabControl>(DefaultPanel);
             AffectsMeasure<TabControl>(TabStripPlacementProperty);
-            ContentControlMixin.Attach<TabControl>(
-                SelectedContentProperty,
-                x => x.LogicalChildren,
-                "PART_SelectedContentHost");
+            SelectedItemProperty.Changed.AddClassHandler<TabControl>((x, e) => x.UpdateSelectedContent());
+            AutomationProperties.ControlTypeOverrideProperty.OverrideDefaultValue<TabControl>(AutomationControlType.Tab);
         }
 
         /// <summary>
@@ -104,7 +105,7 @@ namespace Avalonia.Controls
         /// <summary>
         /// Gets or sets the default data template used to display the content of the selected tab.
         /// </summary>
-        public IDataTemplate ContentTemplate
+        public IDataTemplate? ContentTemplate
         {
             get { return GetValue(ContentTemplateProperty); }
             set { SetValue(ContentTemplateProperty, value); }
@@ -116,7 +117,7 @@ namespace Avalonia.Controls
         /// <value>
         /// The content of the selected tab.
         /// </value>
-        public object SelectedContent
+        public object? SelectedContent
         {
             get { return GetValue(SelectedContentProperty); }
             internal set { SetValue(SelectedContentProperty, value); }
@@ -128,28 +129,75 @@ namespace Avalonia.Controls
         /// <value>
         /// The content template of the selected tab.
         /// </value>
-        public IDataTemplate SelectedContentTemplate
+        public IDataTemplate? SelectedContentTemplate
         {
             get { return GetValue(SelectedContentTemplateProperty); }
             internal set { SetValue(SelectedContentTemplateProperty, value); }
         }
 
-        internal ItemsPresenter ItemsPresenterPart { get; private set; }
+        internal ItemsPresenter? ItemsPresenterPart { get; private set; }
 
-        internal ContentPresenter ContentPart { get; private set; }
+        internal IContentPresenter? ContentPart { get; private set; }
+
+        /// <inheritdoc/>
+        IAvaloniaList<ILogical> IContentPresenterHost.LogicalChildren => LogicalChildren;
+
+        /// <inheritdoc/>
+        bool IContentPresenterHost.RegisterContentPresenter(IContentPresenter presenter)
+        {
+            return RegisterContentPresenter(presenter);
+        }
+
+        protected override void OnContainersMaterialized(ItemContainerEventArgs e)
+        {
+            base.OnContainersMaterialized(e);
+            UpdateSelectedContent();
+        }
+
+        protected override void OnContainersRecycled(ItemContainerEventArgs e)
+        {
+            base.OnContainersRecycled(e);
+            UpdateSelectedContent();
+        }
+
+        private void UpdateSelectedContent()
+        {
+            if (SelectedIndex == -1)
+            {
+                SelectedContent = SelectedContentTemplate = null;
+            }
+            else
+            {
+                var container = SelectedItem as IContentControl ??
+                    ItemContainerGenerator.ContainerFromIndex(SelectedIndex) as IContentControl;
+                SelectedContentTemplate = container?.ContentTemplate;
+                SelectedContent = container?.Content;
+            }
+        }
+
+        /// <summary>
+        /// Called when an <see cref="IContentPresenter"/> is registered with the control.
+        /// </summary>
+        /// <param name="presenter">The presenter.</param>
+        protected virtual bool RegisterContentPresenter(IContentPresenter presenter)
+        {
+            if (presenter.Name == "PART_SelectedContentHost")
+            {
+                ContentPart = presenter;
+                return true;
+            }
+
+            return false;
+        }
 
         protected override IItemContainerGenerator CreateItemContainerGenerator()
         {
             return new TabItemContainerGenerator(this);
         }
 
-        protected override void OnTemplateApplied(TemplateAppliedEventArgs e)
+        protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
         {
-            base.OnTemplateApplied(e);
-
             ItemsPresenterPart = e.NameScope.Get<ItemsPresenter>("PART_ItemsPresenter");
-
-            ContentPart = e.NameScope.Get<ContentPresenter>("PART_SelectedContentHost");
         }
 
         /// <inheritdoc/>
@@ -168,7 +216,7 @@ namespace Avalonia.Controls
         {
             base.OnPointerPressed(e);
 
-            if (e.MouseButton == MouseButton.Left && e.Pointer.Type == PointerType.Mouse)
+            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed && e.Pointer.Type == PointerType.Mouse)
             {
                 e.Handled = UpdateSelectionFromEventSource(e.Source);
             }
@@ -176,7 +224,7 @@ namespace Avalonia.Controls
 
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
-            if (e.MouseButton == MouseButton.Left && e.Pointer.Type != PointerType.Mouse)
+            if (e.InitialPressMouseButton == MouseButton.Left && e.Pointer.Type != PointerType.Mouse)
             {
                 var container = GetContainerFromEventSource(e.Source);
                 if (container != null

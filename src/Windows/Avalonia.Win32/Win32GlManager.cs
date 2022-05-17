@@ -1,25 +1,52 @@
 using Avalonia.OpenGL;
+using Avalonia.OpenGL.Angle;
+using Avalonia.OpenGL.Egl;
+using Avalonia.Win32.OpenGl;
+using Avalonia.Win32.WinRT.Composition;
 
 namespace Avalonia.Win32
 {
     static class Win32GlManager
     {
-        /// <summary>This property is initialized if drawing platform requests OpenGL support</summary>
-        public static EglGlPlatformFeature EglFeature { get; private set; }
-
-        private static bool s_attemptedToInitialize;
 
         public static void Initialize()
         {
-            AvaloniaLocator.CurrentMutable.Bind<IWindowingPlatformGlFeature>().ToFunc(() =>
+            AvaloniaLocator.CurrentMutable.Bind<IPlatformOpenGlInterface>().ToLazy<IPlatformOpenGlInterface>(() =>
             {
-                if (!s_attemptedToInitialize)
+                var opts = AvaloniaLocator.Current.GetService<Win32PlatformOptions>() ?? new Win32PlatformOptions();
+                if (opts.UseWgl)
                 {
-                    EglFeature = EglGlPlatformFeature.TryCreate();
-                    s_attemptedToInitialize = true;
+                    var wgl = WglPlatformOpenGlInterface.TryCreate();
+                    return wgl;
                 }
 
-                return EglFeature;
+                if (opts.AllowEglInitialization ?? Win32Platform.WindowsVersion > PlatformConstants.Windows7)
+                {
+                    var egl = EglPlatformOpenGlInterface.TryCreate(() => new AngleWin32EglDisplay());
+
+                    if (egl != null)
+                    {
+                        if (opts.EglRendererBlacklist != null)
+                        {
+                            foreach (var item in opts.EglRendererBlacklist)
+                            {
+                                if (egl.PrimaryEglContext.GlInterface.Renderer.Contains(item))
+                                {
+                                    return null;
+                                }
+                            }
+                        }
+                        
+                        if (opts.UseWindowsUIComposition)
+                        {
+                            WinUICompositorConnection.TryCreateAndRegister(egl, opts.CompositionBackdropCornerRadius);
+                        }
+                    }
+
+                    return egl;
+                }
+
+                return null;
             });
         }
     }

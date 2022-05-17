@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 namespace Avalonia.Data
 {
     /// <summary>
@@ -23,10 +20,10 @@ namespace Avalonia.Data
         /// <returns>
         /// A <see cref="InstancedBinding"/> or null if the binding could not be resolved.
         /// </returns>
-        InstancedBinding Initiate(
+        InstancedBinding? Initiate(
             IAvaloniaObject target, 
-            AvaloniaProperty targetProperty,
-            object anchor = null,
+            AvaloniaProperty? targetProperty,
+            object? anchor = null,
             bool enableDataValidation = false);
     }
 }

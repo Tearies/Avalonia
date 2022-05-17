@@ -18,8 +18,8 @@ namespace Avalonia.Controls.Remote
         }
 
         private readonly IAvaloniaRemoteTransportConnection _connection;
-        private FrameMessage _lastFrame;
-        private WriteableBitmap _bitmap;
+        private FrameMessage? _lastFrame;
+        private WriteableBitmap? _bitmap;
         public RemoteWidget(IAvaloniaRemoteTransportConnection connection)
         {
             Mode = SizingMode.Local;
@@ -70,12 +70,18 @@ namespace Avalonia.Controls.Remote
 
         public override void Render(DrawingContext context)
         {
-            if (_lastFrame != null)
+            if (_lastFrame != null && _lastFrame.Width != 0 && _lastFrame.Height != 0)
             {
                 var fmt = (PixelFormat) _lastFrame.Format;
                 if (_bitmap == null || _bitmap.PixelSize.Width != _lastFrame.Width ||
                     _bitmap.PixelSize.Height != _lastFrame.Height)
-                    _bitmap = new WriteableBitmap(new PixelSize(_lastFrame.Width, _lastFrame.Height), new Vector(96, 96), fmt);
+                {
+                    _bitmap?.Dispose();
+#pragma warning disable CS0618 // Type or member is obsolete
+                    _bitmap = new WriteableBitmap(new PixelSize(_lastFrame.Width, _lastFrame.Height),
+                        new Vector(96, 96), fmt);
+#pragma warning restore CS0618 // Type or member is obsolete
+                }
                 using (var l = _bitmap.Lock())
                 {
                     var lineLen = (fmt == PixelFormat.Rgb565 ? 2 : 4) * _lastFrame.Width;
@@ -83,7 +89,7 @@ namespace Avalonia.Controls.Remote
                         Marshal.Copy(_lastFrame.Data, y * _lastFrame.Stride,
                             new IntPtr(l.Address.ToInt64() + l.RowBytes * y), lineLen);
                 }
-                context.DrawImage(_bitmap, 1, new Rect(0, 0, _bitmap.PixelSize.Width, _bitmap.PixelSize.Height),
+                context.DrawImage(_bitmap, new Rect(0, 0, _bitmap.PixelSize.Width, _bitmap.PixelSize.Height),
                     new Rect(Bounds.Size));
             }
             base.Render(context);

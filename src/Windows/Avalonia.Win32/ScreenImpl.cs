@@ -1,16 +1,15 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia.Platform;
+using Avalonia.Win32.Interop;
 using static Avalonia.Win32.Interop.UnmanagedMethods;
 
 namespace Avalonia.Win32
 {
     public class ScreenImpl : IScreenImpl
     {
-        public  int ScreenCount
+        public int ScreenCount
         {
             get => GetSystemMetrics(SystemMetric.SM_CMONITORS);
         }
@@ -28,17 +27,35 @@ namespace Avalonia.Win32
                         (IntPtr monitor, IntPtr hdcMonitor, ref Rect lprcMonitor, IntPtr data) =>
                         {
                             MONITORINFO monitorInfo = MONITORINFO.Create();
-                            if (GetMonitorInfo(monitor,ref monitorInfo))
+                            if (GetMonitorInfo(monitor, ref monitorInfo))
                             {
+                                var dpi = 1.0;
+
+                                var shcore = LoadLibrary("shcore.dll");
+                                var method = GetProcAddress(shcore, nameof(GetDpiForMonitor));
+                                if (method != IntPtr.Zero)
+                                {
+                                    GetDpiForMonitor(monitor, MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out var x, out _);
+                                    dpi = (double)x;
+                                }
+                                else
+                                {
+                                    var hdc = GetDC(IntPtr.Zero);
+
+                                    double virtW = GetDeviceCaps(hdc, DEVICECAP.HORZRES);
+                                    double physW = GetDeviceCaps(hdc, DEVICECAP.DESKTOPHORZRES);
+
+                                    dpi = (96d * physW / virtW);
+
+                                    ReleaseDC(IntPtr.Zero, hdc);
+                                }
+
                                 RECT bounds = monitorInfo.rcMonitor;
                                 RECT workingArea = monitorInfo.rcWork;
-                                PixelRect avaloniaBounds = new PixelRect(bounds.left, bounds.top, bounds.right - bounds.left,
-                                    bounds.bottom - bounds.top);
-                                PixelRect avaloniaWorkArea =
-                                    new PixelRect(workingArea.left, workingArea.top, workingArea.right - workingArea.left,
-                                        workingArea.bottom - workingArea.top);
+                                PixelRect avaloniaBounds = bounds.ToPixelRect();
+                                PixelRect avaloniaWorkArea = workingArea.ToPixelRect();
                                 screens[index] =
-                                    new WinScreen(avaloniaBounds, avaloniaWorkArea, monitorInfo.dwFlags == 1,
+                                    new WinScreen(dpi / 96.0d, avaloniaBounds, avaloniaWorkArea, monitorInfo.dwFlags == 1,
                                         monitor);
                                 index++;
                             }
@@ -53,6 +70,44 @@ namespace Avalonia.Win32
         public void InvalidateScreensCache()
         {
             _allScreens = null;
+        }
+
+        public Screen ScreenFromWindow(IWindowBaseImpl window)
+        {
+            var handle = window.Handle.Handle;
+
+            var monitor = MonitorFromWindow(handle, MONITOR.MONITOR_DEFAULTTONULL);
+
+            return FindScreenByHandle(monitor);
+        }
+
+        public Screen ScreenFromPoint(PixelPoint point)
+        {
+            var monitor = MonitorFromPoint(new POINT
+            {
+                X = point.X,
+                Y = point.Y
+            }, MONITOR.MONITOR_DEFAULTTONULL);
+
+            return FindScreenByHandle(monitor);
+        }
+
+        public Screen ScreenFromRect(PixelRect rect)
+        {
+            var monitor = MonitorFromRect(new RECT
+            {
+                left = rect.TopLeft.X,
+                top = rect.TopLeft.Y,
+                right = rect.TopRight.X,
+                bottom = rect.BottomRight.Y
+            }, MONITOR.MONITOR_DEFAULTTONULL);
+
+            return FindScreenByHandle(monitor);
+        }
+
+        private Screen FindScreenByHandle(IntPtr handle)
+        {
+            return AllScreens.Cast<WinScreen>().FirstOrDefault(m => m.Handle == handle);
         }
     }
 }

@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -25,17 +22,22 @@ namespace Avalonia.Data
         /// <summary>
         /// Gets or sets the <see cref="IMultiValueConverter"/> to use.
         /// </summary>
-        public IMultiValueConverter Converter { get; set; }
+        public IMultiValueConverter? Converter { get; set; }
 
         /// <summary>
         /// Gets or sets a parameter to pass to <see cref="Converter"/>.
         /// </summary>
-        public object ConverterParameter { get; set; }
+        public object? ConverterParameter { get; set; }
 
         /// <summary>
         /// Gets or sets the value to use when the binding is unable to produce a value.
         /// </summary>
         public object FallbackValue { get; set; }
+
+        /// <summary>
+        /// Gets or sets the value to use when the binding result is null.
+        /// </summary>
+        public object TargetNullValue { get; set; }
 
         /// <summary>
         /// Gets or sets the binding mode.
@@ -46,22 +48,28 @@ namespace Avalonia.Data
         /// Gets or sets the binding priority.
         /// </summary>
         public BindingPriority Priority { get; set; }
-        
+
         /// <summary>
         /// Gets or sets the relative source for the binding.
         /// </summary>
-        public RelativeSource RelativeSource { get; set; }
+        public RelativeSource? RelativeSource { get; set; }
 
         /// <summary>
         /// Gets or sets the string format.
         /// </summary>
-        public string StringFormat { get; set; }
+        public string? StringFormat { get; set; }
+
+        public MultiBinding()
+        {
+            FallbackValue = AvaloniaProperty.UnsetValue;
+            TargetNullValue = AvaloniaProperty.UnsetValue;
+        }
 
         /// <inheritdoc/>
-        public InstancedBinding Initiate(
+        public InstancedBinding? Initiate(
             IAvaloniaObject target,
-            AvaloniaProperty targetProperty,
-            object anchor = null,
+            AvaloniaProperty? targetProperty,
+            object? anchor = null,
             bool enableDataValidation = false)
         {
             var targetType = targetProperty?.PropertyType ?? typeof(object);
@@ -69,14 +77,20 @@ namespace Avalonia.Data
             // We only respect `StringFormat` if the type of the property we're assigning to will
             // accept a string. Note that this is slightly different to WPF in that WPF only applies
             // `StringFormat` for target type `string` (not `object`).
-            if (!string.IsNullOrWhiteSpace(StringFormat) && 
+            if (!string.IsNullOrWhiteSpace(StringFormat) &&
                 (targetType == typeof(string) || targetType == typeof(object)))
             {
-                converter = new StringFormatMultiValueConverter(StringFormat, converter);
+                converter = new StringFormatMultiValueConverter(StringFormat!, converter);
             }
-            
+
             var children = Bindings.Select(x => x.Initiate(target, null));
-            var input = children.Select(x => x.Observable).CombineLatest().Select(x => ConvertValue(x, targetType, converter));
+
+            var input = children.Select(x => x?.Observable!)
+                                .Where(x => x is not null)
+                                .CombineLatest()
+                                .Select(x => ConvertValue(x, targetType, converter))
+                                .Where(x => x != BindingOperations.DoNothing);
+
             var mode = Mode == BindingMode.Default ?
                 targetProperty?.GetMetadata(target.GetType()).DefaultBindingMode : Mode;
 
@@ -92,14 +106,31 @@ namespace Avalonia.Data
             }
         }
 
-        private object ConvertValue(IList<object> values, Type targetType, IMultiValueConverter converter)
+        private object ConvertValue(IList<object?> values, Type targetType, IMultiValueConverter? converter)
         {
-            var culture = CultureInfo.CurrentCulture;
-            var converted = converter.Convert(values, targetType, ConverterParameter, culture);
-
-            if (converted == BindingOperations.DoNothing)
+            for (var i = 0; i < values.Count; ++i)
             {
-                return converted;
+                if (values[i] is BindingNotification notification)
+                {
+                    values[i] = notification.Value;
+                }
+            }
+
+            var culture = CultureInfo.CurrentCulture;
+            values = new System.Collections.ObjectModel.ReadOnlyCollection<object?>(values);
+            object? converted;
+            if (converter != null)
+            {
+                converted = converter.Convert(values, targetType, ConverterParameter, culture);
+            }
+            else
+            {
+                converted = values;
+            }
+
+            if (converted == null)
+            {
+                converted = TargetNullValue;
             }
 
             if (converted == AvaloniaProperty.UnsetValue)

@@ -15,18 +15,20 @@ namespace ControlCatalog.Models
     {
         string _firstName;
         string _lastName;
+        bool _isBanned;
+        private int _age;
 
         public string FirstName
         {
             get => _firstName;
             set
             {
+                _firstName = value;
                 if (string.IsNullOrWhiteSpace(value))
                     SetError(nameof(FirstName), "First Name Required");
                 else
                     SetError(nameof(FirstName), null);
 
-                _firstName = value;
                 OnPropertyChanged(nameof(FirstName));
             }
 
@@ -37,13 +39,38 @@ namespace ControlCatalog.Models
             get => _lastName;
             set
             {
+                _lastName = value;
                 if (string.IsNullOrWhiteSpace(value))
                     SetError(nameof(LastName), "Last Name Required");
                 else
                     SetError(nameof(LastName), null);
 
-                _lastName = value;
                 OnPropertyChanged(nameof(LastName));
+            }
+        }
+
+        public bool IsBanned
+        {
+            get => _isBanned;
+            set
+            {
+                _isBanned = value;
+
+                OnPropertyChanged(nameof(_isBanned));
+            }
+        }
+
+        
+        /// <summary>
+        ///    Gets or sets the age of the person
+        /// </summary>
+        public int Age
+        {
+            get => _age;
+            set
+            {
+                _age = value;
+                OnPropertyChanged(nameof(Age));
             }
         }
 

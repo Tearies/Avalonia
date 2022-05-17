@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using Avalonia.Native.Interop;
@@ -17,26 +14,32 @@ namespace Avalonia.Native
             _native = native;
         }
 
-        public int ScreenCount => _native.GetScreenCount();
+        public int ScreenCount => _native.ScreenCount;
 
         public IReadOnlyList<Screen> AllScreens
         {
             get
             {
-                var count = ScreenCount;
-                var result = new Screen[count];
-
-                for(int i = 0; i < count; i++)
+                if (_native != null)
                 {
-                    var screen = _native.GetScreen(i);
+                    var count = ScreenCount;
+                    var result = new Screen[count];
 
-                    result[i] = new Screen(
-                        screen.Bounds.ToAvaloniaPixelRect(),
-                        screen.WorkingArea.ToAvaloniaPixelRect(),
-                        screen.Primary);
+                    for (int i = 0; i < count; i++)
+                    {
+                        var screen = _native.GetScreen(i);
+
+                        result[i] = new Screen(
+                            screen.PixelDensity,
+                            screen.Bounds.ToAvaloniaPixelRect(),
+                            screen.WorkingArea.ToAvaloniaPixelRect(),
+                            screen.Primary.FromComBool());
+                    }
+
+                    return result;
                 }
 
-                return result;
+                return Array.Empty<Screen>();
             }
         }
 
@@ -44,6 +47,21 @@ namespace Avalonia.Native
         {
             _native?.Dispose();
             _native = null;
+        }
+
+        public Screen ScreenFromPoint(PixelPoint point)
+        {
+            return ScreenHelper.ScreenFromPoint(point, AllScreens);
+        }
+
+        public Screen ScreenFromRect(PixelRect rect)
+        {
+            return ScreenHelper.ScreenFromRect(rect, AllScreens);
+        }
+
+        public Screen ScreenFromWindow(IWindowBaseImpl window)
+        {
+            return ScreenHelper.ScreenFromWindow(window, AllScreens);
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿using Avalonia.Controls.Presenters;
+﻿using System.Linq;
+using Avalonia.Controls.Presenters;
+using Avalonia.UnitTests;
 using Xunit;
 
 namespace Avalonia.Controls.UnitTests.Presenters
@@ -8,33 +10,46 @@ namespace Avalonia.Controls.UnitTests.Presenters
         [Fact]
         public void TextPresenter_Can_Contain_Null_With_Password_Char_Set()
         {
-            var target = new TextPresenter
+            using (UnitTestApplication.Start(TestServices.MockPlatformRenderInterface))
             {
-                PasswordChar = '*'
-            };
+                var target = new TextPresenter
+                {
+                    PasswordChar = '*'
+                };
 
-            Assert.NotNull(target.FormattedText);
+                Assert.NotNull(target.TextLayout);
+            }
         }
 
         [Fact]
         public void TextPresenter_Can_Contain_Null_WithOut_Password_Char_Set()
         {
-            var target = new TextPresenter();
+            using (UnitTestApplication.Start(TestServices.MockPlatformRenderInterface))
+            {
 
-            Assert.NotNull(target.FormattedText);
+                var target = new TextPresenter();
+
+                Assert.NotNull(target.TextLayout);
+            }
         }
 
         [Fact]
         public void Text_Presenter_Replaces_Formatted_Text_With_Password_Char()
         {
-            var target = new TextPresenter
+            using (UnitTestApplication.Start(TestServices.MockPlatformRenderInterface))
             {
-                PasswordChar = '*',
-                Text = "Test"
-            };
 
-            Assert.NotNull(target.FormattedText);
-            Assert.Equal("****", target.FormattedText.Text);
+                var target = new TextPresenter { PasswordChar = '*', Text = "Test" };
+
+                target.Measure(Size.Infinity);
+
+                Assert.NotNull(target.TextLayout);
+
+                var actual = string.Join(null,
+                    target.TextLayout.TextLines.SelectMany(x => x.TextRuns).Select(x => x.Text.Span.ToString()));
+
+                Assert.Equal("****", actual);
+            }
         }
     }
 }

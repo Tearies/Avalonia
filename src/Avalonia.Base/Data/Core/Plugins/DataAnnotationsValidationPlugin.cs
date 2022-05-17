@@ -1,7 +1,4 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -15,9 +12,11 @@ namespace Avalonia.Data.Core.Plugins
     public class DataAnnotationsValidationPlugin : IDataValidationPlugin
     {
         /// <inheritdoc/>
-        public bool Match(WeakReference reference, string memberName)
+        public bool Match(WeakReference<object?> reference, string memberName)
         {
-            return reference.Target?
+            reference.TryGetTarget(out var target);
+
+            return target?
                 .GetType()
                 .GetRuntimeProperty(memberName)?
                 .GetCustomAttributes<ValidationAttribute>()
@@ -25,29 +24,30 @@ namespace Avalonia.Data.Core.Plugins
         }
 
         /// <inheritdoc/>
-        public IPropertyAccessor Start(WeakReference reference, string name, IPropertyAccessor inner)
+        public IPropertyAccessor Start(WeakReference<object?> reference, string name, IPropertyAccessor inner)
         {
             return new Accessor(reference, name, inner);
         }
 
-        private class Accessor : DataValidationBase
+        private sealed class Accessor : DataValidationBase
         {
-            private ValidationContext _context;
+            private readonly ValidationContext? _context;
 
-            public Accessor(WeakReference reference, string name, IPropertyAccessor inner)
+            public Accessor(WeakReference<object?> reference, string name, IPropertyAccessor inner)
                 : base(inner)
             {
-                _context = new ValidationContext(reference.Target);
-                _context.MemberName = name;
+                if (reference.TryGetTarget(out var target))
+                {
+                    _context = new ValidationContext(target);
+                    _context.MemberName = name;
+                }
             }
 
-            public override bool SetValue(object value, BindingPriority priority)
+            protected override void InnerValueChanged(object? value)
             {
-                return base.SetValue(value, priority);
-            }
+                if (_context is null)
+                    return;
 
-            protected override void InnerValueChanged(object value)
-            {
                 var errors = new List<ValidationResult>();
 
                 if (Validator.TryValidateProperty(value, _context, errors))
@@ -67,12 +67,12 @@ namespace Avalonia.Data.Core.Plugins
             {
                 if (errors.Count == 1)
                 {
-                    return new ValidationException(errors[0].ErrorMessage);
+                    return new DataValidationException(errors[0].ErrorMessage);
                 }
                 else
                 {
                     return new AggregateException(
-                        errors.Select(x => new ValidationException(x.ErrorMessage)));
+                        errors.Select(x => new DataValidationException(x.ErrorMessage)));
                 }
             }
         }

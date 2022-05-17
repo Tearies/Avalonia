@@ -1,6 +1,6 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
+using Avalonia.Automation;
+using Avalonia.Automation.Peers;
+using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Mixins;
 using Avalonia.Controls.Primitives;
 
@@ -9,6 +9,7 @@ namespace Avalonia.Controls
     /// <summary>
     /// An item in  a <see cref="TabStrip"/> or <see cref="TabControl"/>.
     /// </summary>
+    [PseudoClasses(":pressed", ":selected")]
     public class TabItem : HeaderedContentControl, ISelectable
     {
         /// <summary>
@@ -29,9 +30,10 @@ namespace Avalonia.Controls
         static TabItem()
         {
             SelectableMixin.Attach<TabItem>(IsSelectedProperty);
+            PressedMixin.Attach<TabItem>();
             FocusableProperty.OverrideDefaultValue(typeof(TabItem), true);
-            IsSelectedProperty.Changed.AddClassHandler<TabItem>(x => x.UpdateSelectedContent);
-            DataContextProperty.Changed.AddClassHandler<TabItem>(x => x.UpdateHeader);
+            DataContextProperty.Changed.AddClassHandler<TabItem>((x, e) => x.UpdateHeader(e));
+            AutomationProperties.ControlTypeOverrideProperty.OverrideDefaultValue<TabItem>(AutomationControlType.TabItem);
         }
 
         /// <summary>
@@ -54,7 +56,7 @@ namespace Avalonia.Controls
             set { SetValue(IsSelectedProperty, value); }
         }
 
-        internal TabControl ParentTabControl { get; set; }
+        protected override AutomationPeer OnCreateAutomationPeer() => new ListItemAutomationPeer(this);
 
         private void UpdateHeader(AvaloniaPropertyChangedEventArgs obj)
         {
@@ -82,24 +84,6 @@ namespace Avalonia.Controls
                     Header = obj.NewValue;
                 }
             }          
-        }
-
-        private void UpdateSelectedContent(AvaloniaPropertyChangedEventArgs e)
-        {
-            if (!IsSelected)
-            {
-                return;
-            }
-
-            if (ParentTabControl.SelectedContentTemplate != ContentTemplate)
-            {
-                ParentTabControl.SelectedContentTemplate = ContentTemplate;
-            }
-
-            if (ParentTabControl.SelectedContent != Content)
-            {
-                ParentTabControl.SelectedContent = Content;
-            }
         }
     }
 }

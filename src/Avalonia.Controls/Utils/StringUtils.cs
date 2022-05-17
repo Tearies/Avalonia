@@ -1,7 +1,5 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System.Globalization;
+using Avalonia.Media.TextFormatting.Unicode;
 
 namespace Avalonia.Controls.Utils
 {
@@ -26,26 +24,38 @@ namespace Avalonia.Controls.Utils
                 return false;
             }
 
+            var codepoint = new Codepoint(text[index]);
+
             // A 'word' starts with an AlphaNumeric or some punctuation symbols immediately
             // preceeded by lwsp.
-            if (index > 0 && !char.IsWhiteSpace(text[index - 1]))
+            if (index > 0)
             {
-                return false;
+                var previousCodepoint = new Codepoint(text[index - 1]);
+
+                if (!previousCodepoint.IsWhiteSpace)
+                {
+                    return false;
+                }
+
+                if (previousCodepoint.IsBreakChar)
+                {
+                    return true;
+                }
             }
 
-            switch (CharUnicodeInfo.GetUnicodeCategory(text[index]))
+            switch (codepoint.GeneralCategory)
             {
-                case UnicodeCategory.LowercaseLetter:
-                case UnicodeCategory.TitlecaseLetter:
-                case UnicodeCategory.UppercaseLetter:
-                case UnicodeCategory.DecimalDigitNumber:
-                case UnicodeCategory.LetterNumber:
-                case UnicodeCategory.OtherNumber:
-                case UnicodeCategory.DashPunctuation:
-                case UnicodeCategory.InitialQuotePunctuation:
-                case UnicodeCategory.OpenPunctuation:
-                case UnicodeCategory.CurrencySymbol:
-                case UnicodeCategory.MathSymbol:
+                case GeneralCategory.LowercaseLetter:
+                case GeneralCategory.TitlecaseLetter:
+                case GeneralCategory.UppercaseLetter:
+                case GeneralCategory.DecimalNumber:
+                case GeneralCategory.LetterNumber:
+                case GeneralCategory.OtherNumber:
+                case GeneralCategory.DashPunctuation:
+                case GeneralCategory.InitialPunctuation:
+                case GeneralCategory.OpenPunctuation:
+                case GeneralCategory.CurrencySymbol:
+                case GeneralCategory.MathSymbol:
                     return true;
 
                 // TODO: How do you do this in .NET?
@@ -59,6 +69,11 @@ namespace Avalonia.Controls.Utils
 
         public static int PreviousWord(string text, int cursor)
         {
+            if (string.IsNullOrEmpty(text))
+            {
+                return 0;
+            }
+            
             int begin;
             int i;
             int cr;
@@ -110,7 +125,12 @@ namespace Avalonia.Controls.Utils
 
             cr = LineEnd(text, cursor);
 
-            if (cr < text.Length && text[cr] == '\r' && text[cr + 1] == '\n')
+            if (cursor >= text.Length)
+            {
+                return cursor;
+            }
+            
+            if (cr < text.Length && text[cr] == '\r' && cr + 1 < text.Length && text[cr + 1] == '\n')
             {
                 lf = cr + 1;
             }
@@ -130,17 +150,23 @@ namespace Avalonia.Controls.Utils
                 return cursor;
             }
 
-            CharClass cc = GetCharClass(text[cursor]);
             i = cursor;
 
-            // skip over the word, punctuation, or run of whitespace
-            while (i < cr && GetCharClass(text[i]) == cc)
+            // skip any whitespace after the word/punct
+            while (i < cr && char.IsWhiteSpace(text[i]))
             {
                 i++;
             }
 
-            // skip any whitespace after the word/punct
-            while (i < cr && char.IsWhiteSpace(text[i]))
+            if (i >= cr)
+            {
+                return i;
+            }
+            
+            var cc = GetCharClass(text[i]);
+            
+            // skip over the word, punctuation, or run of whitespace
+            while (i < cr && GetCharClass(text[i]) == cc)
             {
                 i++;
             }

@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -25,6 +22,6 @@ namespace Avalonia.Data.Converters
         /// <see cref="AvaloniaProperty.UnsetValue"/>. Any exception thrown will be treated as
         /// an application exception.
         /// </remarks>
-        object Convert(IList<object> values, Type targetType, object parameter, CultureInfo culture);
+        object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture);
     }
 }

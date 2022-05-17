@@ -1,7 +1,5 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Avalonia.Data;
 
 namespace Avalonia
@@ -16,7 +14,7 @@ namespace Avalonia
     /// <see cref="AvaloniaProperty"/> system. They hold a getter and an optional setter which
     /// allows the avalonia property system to read and write the current value.
     /// </remarks>
-    public class DirectProperty<TOwner, TValue> : AvaloniaProperty<TValue>, IDirectPropertyAccessor
+    public class DirectProperty<TOwner, TValue> : DirectPropertyBase<TValue>, IDirectPropertyAccessor
         where TOwner : IAvaloniaObject
     {
         /// <summary>
@@ -29,13 +27,11 @@ namespace Avalonia
         public DirectProperty(
             string name,
             Func<TOwner, TValue> getter,
-            Action<TOwner, TValue> setter,
+            Action<TOwner, TValue>? setter,
             DirectPropertyMetadata<TValue> metadata)
             : base(name, typeof(TOwner), metadata)
         {
-            Contract.Requires<ArgumentNullException>(getter != null);
-
-            Getter = getter;
+            Getter = getter ?? throw new ArgumentNullException(nameof(getter));
             Setter = setter;
         }
 
@@ -47,15 +43,13 @@ namespace Avalonia
         /// <param name="setter">Sets the value of the property. May be null.</param>
         /// <param name="metadata">Optional overridden metadata.</param>
         private DirectProperty(
-            AvaloniaProperty<TValue> source,
+            DirectPropertyBase<TValue> source,
             Func<TOwner, TValue> getter,
-            Action<TOwner, TValue> setter,
+            Action<TOwner, TValue>? setter,
             DirectPropertyMetadata<TValue> metadata)
             : base(source, typeof(TOwner), metadata)
         {
-            Contract.Requires<ArgumentNullException>(getter != null);
-
-            Getter = getter;
+            Getter = getter ?? throw new ArgumentNullException(nameof(getter));
             Setter = setter;
         }
 
@@ -65,6 +59,9 @@ namespace Avalonia
         /// <inheritdoc/>
         public override bool IsReadOnly => Setter == null;
 
+        /// <inheritdoc/>
+        public override Type Owner => typeof(TOwner);
+
         /// <summary>
         /// Gets the getter function.
         /// </summary>
@@ -73,10 +70,7 @@ namespace Avalonia
         /// <summary>
         /// Gets the setter function.
         /// </summary>
-        public Action<TOwner, TValue> Setter { get; }
-
-        /// <inheritdoc/>
-        Type IDirectPropertyAccessor.Owner => typeof(TOwner);
+        public Action<TOwner, TValue>? Setter { get; }
 
         /// <summary>
         /// Registers the direct property on another type.
@@ -94,8 +88,47 @@ namespace Avalonia
         /// <returns>The property.</returns>
         public DirectProperty<TNewOwner, TValue> AddOwner<TNewOwner>(
             Func<TNewOwner, TValue> getter,
-            Action<TNewOwner, TValue> setter = null,
-            TValue unsetValue = default(TValue),
+            Action<TNewOwner, TValue>? setter = null,
+            TValue unsetValue = default!,
+            BindingMode defaultBindingMode = BindingMode.Default,
+            bool enableDataValidation = false)
+                where TNewOwner : AvaloniaObject
+        {
+            var metadata = new DirectPropertyMetadata<TValue>(
+                unsetValue: unsetValue,
+                defaultBindingMode: defaultBindingMode,
+                enableDataValidation: enableDataValidation);
+
+            metadata.Merge(GetMetadata<TOwner>(), this);
+
+            var result = new DirectProperty<TNewOwner, TValue>(
+                (DirectPropertyBase<TValue>)this,
+                getter,
+                setter,
+                metadata);
+
+            AvaloniaPropertyRegistry.Instance.Register(typeof(TNewOwner), result);
+            return result;
+        }
+
+        /// <summary>
+        /// Registers the direct property on another type.
+        /// </summary>
+        /// <typeparam name="TNewOwner">The type of the additional owner.</typeparam>
+        /// <param name="getter">Gets the current value of the property.</param>
+        /// <param name="setter">Sets the value of the property.</param>
+        /// <param name="unsetValue">
+        /// The value to use when the property is set to <see cref="AvaloniaProperty.UnsetValue"/>
+        /// </param>
+        /// <param name="defaultBindingMode">The default binding mode for the property.</param>
+        /// <param name="enableDataValidation">
+        /// Whether the property is interested in data validation.
+        /// </param>
+        /// <returns>The property.</returns>
+        public DirectProperty<TNewOwner, TValue> AddOwnerWithDataValidation<TNewOwner>(
+            Func<TNewOwner, TValue> getter,
+            Action<TNewOwner,TValue> setter,
+            TValue unsetValue = default!,
             BindingMode defaultBindingMode = BindingMode.Default,
             bool enableDataValidation = false)
                 where TNewOwner : AvaloniaObject
@@ -118,20 +151,40 @@ namespace Avalonia
         }
 
         /// <inheritdoc/>
-        object IDirectPropertyAccessor.GetValue(IAvaloniaObject instance)
+        internal override TValue InvokeGetter(IAvaloniaObject instance)
         {
             return Getter((TOwner)instance);
         }
 
         /// <inheritdoc/>
-        void IDirectPropertyAccessor.SetValue(IAvaloniaObject instance, object value)
+        internal override void InvokeSetter(IAvaloniaObject instance, BindingValue<TValue> value)
         {
             if (Setter == null)
             {
                 throw new ArgumentException($"The property {Name} is readonly.");
             }
 
-            Setter((TOwner)instance, (TValue)value);
+            if (value.HasValue)
+            {
+                Setter((TOwner)instance, value.Value);
+            }
+        }
+
+        /// <inheritdoc/>
+        object? IDirectPropertyAccessor.GetValue(IAvaloniaObject instance)
+        {
+            return Getter((TOwner)instance);
+        }
+
+        /// <inheritdoc/>
+        void IDirectPropertyAccessor.SetValue(IAvaloniaObject instance, object? value)
+        {
+            if (Setter == null)
+            {
+                throw new ArgumentException($"The property {Name} is readonly.");
+            }
+
+            Setter((TOwner)instance, (TValue)value!);
         }
     }
 }

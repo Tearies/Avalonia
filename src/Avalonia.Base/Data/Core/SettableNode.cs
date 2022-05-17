@@ -4,7 +4,7 @@ namespace Avalonia.Data.Core
 {
     public abstract class SettableNode : ExpressionNode
     {
-        public bool SetTargetValue(object value, BindingPriority priority)
+        public bool SetTargetValue(object? value, BindingPriority priority)
         {
             if (ShouldNotSet(value))
             {
@@ -13,21 +13,41 @@ namespace Avalonia.Data.Core
             return SetTargetValueCore(value, priority);
         }
 
-        private bool ShouldNotSet(object value)
+        private bool ShouldNotSet(object? value)
         {
-            if (PropertyType == null)
+            var propertyType = PropertyType;
+            if (propertyType == null)
             {
                 return false;
             }
-            if (PropertyType.IsValueType)
+
+            if (LastValue == null)
             {
-                return LastValue?.Target != null && LastValue.Target.Equals(value);
+                return false;
             }
-            return LastValue != null && Object.ReferenceEquals(LastValue?.Target, value);
+
+            bool isLastValueAlive = LastValue.TryGetTarget(out var lastValue);
+
+            if (!isLastValueAlive)
+            {
+                if (value == null && LastValue == NullReference)
+                {
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (propertyType.IsValueType)
+            {
+                return Equals(lastValue, value);
+            }
+
+            return ReferenceEquals(lastValue, value);
         }
 
-        protected abstract bool SetTargetValueCore(object value, BindingPriority priority);
+        protected abstract bool SetTargetValueCore(object? value, BindingPriority priority);
 
-        public abstract Type PropertyType { get; }
+        public abstract Type? PropertyType { get; }
     }
 }

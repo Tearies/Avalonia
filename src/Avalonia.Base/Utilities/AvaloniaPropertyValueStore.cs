@@ -1,8 +1,6 @@
-﻿// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Avalonia.Utilities
 {
@@ -12,13 +10,18 @@ namespace Avalonia.Utilities
     /// <typeparam name="TValue">Stored value type.</typeparam>
     internal sealed class AvaloniaPropertyValueStore<TValue>
     {
+        // The last item in the list is always int.MaxValue.
+        private static readonly Entry[] s_emptyEntries = { new Entry { PropertyId = int.MaxValue, Value = default! } };
+        
         private Entry[] _entries;
 
         public AvaloniaPropertyValueStore()
         {
-            // The last item in the list is always int.MaxValue
-            _entries = new[] { new Entry { PropertyId = int.MaxValue, Value = default } };
+            _entries = s_emptyEntries;
         }
+
+        public int Count => _entries.Length - 1;
+        public TValue this[int index] => _entries[index].Value;
 
         private (int, bool) TryFindEntry(int propertyId)
         {
@@ -89,7 +92,7 @@ namespace Avalonia.Utilities
             return (0, false);
         }
 
-        public bool TryGetValue(AvaloniaProperty property, out TValue value)
+        public bool TryGetValue(AvaloniaProperty property, [MaybeNullWhen(false)] out TValue value)
         {
             (int index, bool found) = TryFindEntry(property.Id);
             if (!found)
@@ -129,16 +132,36 @@ namespace Avalonia.Utilities
             _entries[TryFindEntry(property.Id).Item1].Value = value;
         }
 
-        public Dictionary<AvaloniaProperty, TValue> ToDictionary()
+        public void Remove(AvaloniaProperty property)
         {
-            var dict = new Dictionary<AvaloniaProperty, TValue>(_entries.Length - 1);
+            var (index, found) = TryFindEntry(property.Id);
 
-            for (int i = 0; i < _entries.Length - 1; ++i)
+            if (found)
             {
-                dict.Add(AvaloniaPropertyRegistry.Instance.FindRegistered(_entries[i].PropertyId), _entries[i].Value);
-            }
+                var newLength = _entries.Length - 1;
+                
+                // Special case - one element left means that value store is empty so we can just reuse our "empty" array.
+                if (newLength == 1)
+                {
+                    _entries = s_emptyEntries;
+                    
+                    return;
+                }
+                
+                var entries = new Entry[newLength];
 
-            return dict;
+                int ix = 0;
+
+                for (int i = 0; i < _entries.Length; ++i)
+                {
+                    if (i != index)
+                    {
+                        entries[ix++] = _entries[i];
+                    }
+                }
+
+                _entries = entries;
+            }
         }
 
         private struct Entry

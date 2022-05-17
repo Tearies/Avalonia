@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 
 namespace Avalonia.Diagnostics
@@ -17,6 +14,6 @@ namespace Avalonia.Diagnostics
         /// <returns>
         /// The subscribers or null if no subscribers.
         /// </returns>
-        Delegate[] GetPropertyChangedSubscribers();
+        Delegate[]? GetPropertyChangedSubscribers();
     }
 }

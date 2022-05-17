@@ -1,6 +1,3 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections.Specialized;
 using Avalonia.Controls.Primitives;
@@ -24,6 +21,7 @@ namespace Avalonia.Controls.Presenters
 
         private bool _canHorizontallyScroll;
         private bool _canVerticallyScroll;
+        private EventHandler? _scrollInvalidated;
 
         /// <summary>
         /// Initializes static members of the <see cref="ItemsPresenter"/> class.
@@ -35,7 +33,7 @@ namespace Avalonia.Controls.Presenters
                 KeyboardNavigationMode.Once);
 
             VirtualizationModeProperty.Changed
-                .AddClassHandler<ItemsPresenter>(x => x.VirtualizationModeChanged);
+                .AddClassHandler<ItemsPresenter>((x, e) => x.VirtualizationModeChanged(e));
         }
 
         /// <summary>
@@ -98,15 +96,19 @@ namespace Avalonia.Controls.Presenters
         Size IScrollable.Viewport => Virtualizer?.Viewport ?? Bounds.Size;
 
         /// <inheritdoc/>
-        Action ILogicalScrollable.InvalidateScroll { get; set; }
+        event EventHandler? ILogicalScrollable.ScrollInvalidated
+        {
+            add => _scrollInvalidated += value;
+            remove => _scrollInvalidated -= value;
+        }
 
         /// <inheritdoc/>
-        Size ILogicalScrollable.ScrollSize => new Size(1, 1);
+        Size ILogicalScrollable.ScrollSize => new Size(ScrollViewer.DefaultSmallChange, 1);
 
         /// <inheritdoc/>
-        Size ILogicalScrollable.PageScrollSize => new Size(0, 1);
+        Size ILogicalScrollable.PageScrollSize => Virtualizer?.Viewport ?? new Size(16, 16);
 
-        internal ItemVirtualizer Virtualizer { get; private set; }
+        internal ItemVirtualizer? Virtualizer { get; private set; }
 
         /// <inheritdoc/>
         bool ILogicalScrollable.BringIntoView(IControl target, Rect targetRect)
@@ -115,14 +117,20 @@ namespace Avalonia.Controls.Presenters
         }
 
         /// <inheritdoc/>
-        IControl ILogicalScrollable.GetControlInDirection(NavigationDirection direction, IControl from)
+        IControl? ILogicalScrollable.GetControlInDirection(NavigationDirection direction, IControl? from)
         {
             return Virtualizer?.GetControlInDirection(direction, from);
         }
 
-        public override void ScrollIntoView(object item)
+        /// <inheritdoc/>
+        void ILogicalScrollable.RaiseScrollInvalidated(EventArgs e)
         {
-            Virtualizer?.ScrollIntoView(item);
+            _scrollInvalidated?.Invoke(this, e);
+        }
+
+        public override void ScrollIntoView(int index)
+        {
+            Virtualizer?.ScrollIntoView(index);
         }
 
         /// <inheritdoc/>
@@ -141,10 +149,10 @@ namespace Avalonia.Controls.Presenters
         {
             Virtualizer?.Dispose();
             Virtualizer = ItemVirtualizer.Create(this);
-            ((ILogicalScrollable)this).InvalidateScroll?.Invoke();
+            _scrollInvalidated?.Invoke(this, EventArgs.Empty);
 
             KeyboardNavigation.SetTabNavigation(
-                (InputElement)Panel,
+                (InputElement)panel,
                 KeyboardNavigation.GetTabNavigation(this));
         }
 
@@ -165,7 +173,7 @@ namespace Avalonia.Controls.Presenters
         {
             Virtualizer?.Dispose();
             Virtualizer = ItemVirtualizer.Create(this);
-            ((ILogicalScrollable)this).InvalidateScroll?.Invoke();
+            _scrollInvalidated?.Invoke(this, EventArgs.Empty);
         }
     }
 }

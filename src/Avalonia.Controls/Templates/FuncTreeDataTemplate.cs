@@ -1,9 +1,5 @@
-// Copyright (c) The Avalonia Project. All rights reserved.
-// Licensed under the MIT license. See licence.md file in the project root for full license information.
-
 using System;
 using System.Collections;
-using System.Reflection;
 using Avalonia.Data;
 
 namespace Avalonia.Controls.Templates
@@ -13,7 +9,7 @@ namespace Avalonia.Controls.Templates
     /// </summary>
     public class FuncTreeDataTemplate : FuncDataTemplate, ITreeDataTemplate
     {
-        private readonly Func<object, IEnumerable> _itemsSelector;
+        private readonly Func<object?, IEnumerable> _itemsSelector;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FuncTreeDataTemplate"/> class.
@@ -28,8 +24,8 @@ namespace Avalonia.Controls.Templates
         /// </param>
         public FuncTreeDataTemplate(
             Type type,
-            Func<object, INameScope, IControl> build,
-            Func<object, IEnumerable> itemsSelector)
+            Func<object?, INameScope, IControl> build,
+            Func<object?, IEnumerable> itemsSelector)
             : this(o => IsInstance(o, type), build, itemsSelector)
         {
         }
@@ -47,9 +43,9 @@ namespace Avalonia.Controls.Templates
         /// A function which when passed a matching object returns the child items.
         /// </param>
         public FuncTreeDataTemplate(
-            Func<object, bool> match,
-            Func<object, INameScope, IControl> build,
-            Func<object, IEnumerable> itemsSelector)
+            Func<object?, bool> match,
+            Func<object?, INameScope, IControl?> build,
+            Func<object?, IEnumerable> itemsSelector)
             : base(match, build)
         {
             _itemsSelector = itemsSelector;
@@ -62,7 +58,7 @@ namespace Avalonia.Controls.Templates
         /// <returns>The child items, or null if no child items.</returns>
         public InstancedBinding ItemsSelector(object item)
         {
-            return InstancedBinding.OneTime(this?._itemsSelector(item));
+            return InstancedBinding.OneTime(_itemsSelector(item));
         }
 
         /// <summary>
@@ -73,9 +69,9 @@ namespace Avalonia.Controls.Templates
         /// <returns>
         /// True if <paramref name="o"/> is of type <paramref name="t"/>, otherwise false.
         /// </returns>
-        private static bool IsInstance(object o, Type t)
+        private static bool IsInstance(object? o, Type t)
         {
-            return (o != null) && t.GetTypeInfo().IsAssignableFrom(o.GetType().GetTypeInfo());
+            return t.IsInstanceOfType(o);
         }
     }
 }
