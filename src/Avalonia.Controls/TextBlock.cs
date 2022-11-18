@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls.Documents;
 using Avalonia.Layout;
@@ -84,6 +83,15 @@ namespace Avalonia.Controls
                 inherits: true);
 
         /// <summary>
+        /// Defines the <see cref="LetterSpacing"/> property.
+        /// </summary>
+        public static readonly AttachedProperty<double> LetterSpacingProperty =
+            AvaloniaProperty.RegisterAttached<TextBlock, Control, double>(
+                nameof(LetterSpacing),
+                0,
+                inherits: true);
+
+        /// <summary>
         /// Defines the <see cref="MaxLines"/> property.
         /// </summary>
         public static readonly AttachedProperty<int> MaxLinesProperty =
@@ -98,36 +106,30 @@ namespace Avalonia.Controls
         public static readonly DirectProperty<TextBlock, string?> TextProperty =
             AvaloniaProperty.RegisterDirect<TextBlock, string?>(
                 nameof(Text),
-                o => o.Text,
-                (o, v) => o.Text = v);
-
-        /// <summary>
-        /// Defines the <see cref="Inlines"/> property.
-        /// </summary>
-        public static readonly DirectProperty<TextBlock, InlineCollection> InlinesProperty =
-            AvaloniaProperty.RegisterDirect<TextBlock, InlineCollection>(
-                nameof(Inlines),
-                o => o.Inlines);
+                o => o.GetText(),
+                (o, v) => o.SetText(v));
 
         /// <summary>
         /// Defines the <see cref="TextAlignment"/> property.
         /// </summary>
         public static readonly AttachedProperty<TextAlignment> TextAlignmentProperty =
-            AvaloniaProperty.RegisterAttached<TextBlock, Control, TextAlignment>(nameof(TextAlignment), 
+            AvaloniaProperty.RegisterAttached<TextBlock, Control, TextAlignment>(
+                nameof(TextAlignment),
+                defaultValue: TextAlignment.Start,
                 inherits: true);
 
         /// <summary>
         /// Defines the <see cref="TextWrapping"/> property.
         /// </summary>
         public static readonly AttachedProperty<TextWrapping> TextWrappingProperty =
-            AvaloniaProperty.RegisterAttached<TextBlock, Control, TextWrapping>(nameof(TextWrapping), 
+            AvaloniaProperty.RegisterAttached<TextBlock, Control, TextWrapping>(nameof(TextWrapping),
                 inherits: true);
 
         /// <summary>
         /// Defines the <see cref="TextTrimming"/> property.
         /// </summary>
         public static readonly AttachedProperty<TextTrimming> TextTrimmingProperty =
-            AvaloniaProperty.RegisterAttached<TextBlock, Control, TextTrimming>(nameof(TextTrimming), 
+            AvaloniaProperty.RegisterAttached<TextBlock, Control, TextTrimming>(nameof(TextTrimming),
                 defaultValue: TextTrimming.None,
                 inherits: true);
 
@@ -137,8 +139,17 @@ namespace Avalonia.Controls
         public static readonly StyledProperty<TextDecorationCollection?> TextDecorationsProperty =
             AvaloniaProperty.Register<TextBlock, TextDecorationCollection?>(nameof(TextDecorations));
 
-        private TextLayout? _textLayout;
-        private Size _constraint;
+        /// <summary>
+        /// Defines the <see cref="Inlines"/> property.
+        /// </summary>
+        public static readonly StyledProperty<InlineCollection?> InlinesProperty =
+            AvaloniaProperty.Register<TextBlock, InlineCollection?>(
+                nameof(Inlines));
+
+        internal string? _text;
+        protected TextLayout? _textLayout;
+        protected Size _constraint;
+        private IReadOnlyList<TextRun>? _textRuns;
 
         /// <summary>
         /// Initializes static members of the <see cref="TextBlock"/> class.
@@ -146,16 +157,17 @@ namespace Avalonia.Controls
         static TextBlock()
         {
             ClipToBoundsProperty.OverrideDefaultValue<TextBlock>(true);
-            
+
             AffectsRender<TextBlock>(BackgroundProperty, ForegroundProperty);
         }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="TextBlock"/> class.
-        /// </summary>
         public TextBlock()
         {
-            Inlines = new InlineCollection(this, this);
+            Inlines = new InlineCollection
+            {
+                LogicalChildren = LogicalChildren,
+                InlineHost = this
+            };
         }
 
         /// <summary>
@@ -165,7 +177,7 @@ namespace Avalonia.Controls
         {
             get
             {
-                return _textLayout ?? (_textLayout = CreateTextLayout(_constraint, Text));
+                return _textLayout ??= CreateTextLayout(_text);
             }
         }
 
@@ -192,27 +204,9 @@ namespace Avalonia.Controls
         /// </summary>
         public string? Text
         {
-            get => Inlines.Text;
-            set
-            {
-                var old = Text;
-
-                if (value == old)
-                {
-                    return;
-                }
-
-                Inlines.Text = value;
-
-                RaisePropertyChanged(TextProperty, old, value);
-            }
+            get => GetText();
+            set => SetText(value);
         }
-
-        /// <summary>
-        /// Gets the inlines.
-        /// </summary>
-        [Content]
-        public InlineCollection Inlines { get; }
 
         /// <summary>
         /// Gets or sets the font family used to draw the control's text.
@@ -278,6 +272,15 @@ namespace Avalonia.Controls
         }
 
         /// <summary>
+        /// Gets or sets the letter spacing.
+        /// </summary>
+        public double LetterSpacing
+        {
+            get => GetValue(LetterSpacingProperty);
+            set => SetValue(LetterSpacingProperty, value);
+        }
+
+        /// <summary>
         /// Gets or sets the maximum number of text lines.
         /// </summary>
         public int MaxLines
@@ -321,8 +324,20 @@ namespace Avalonia.Controls
             get => GetValue(TextDecorationsProperty);
             set => SetValue(TextDecorationsProperty, value);
         }
-        
+
+        /// <summary>
+        /// Gets or sets the inlines.
+        /// </summary>
+        [Content]
+        public InlineCollection? Inlines
+        {
+            get => GetValue(InlinesProperty);
+            set => SetValue(InlinesProperty, value);
+        }
+
         protected override bool BypassFlowDirectionPolicies => true;
+
+        internal bool HasComplexContent => Inlines != null && Inlines.Count > 0;
 
         /// <summary>
         /// The BaselineOffset property provides an adjustment to baseline offset
@@ -482,6 +497,35 @@ namespace Avalonia.Controls
         /// Reads the attached property from the given element
         /// </summary>
         /// <param name="control">The element to which to read the attached property.</param>
+        public static double GetLetterSpacing(Control control)
+        {
+            if (control == null)
+            {
+                throw new ArgumentNullException(nameof(control));
+            }
+
+            return control.GetValue(LetterSpacingProperty);
+        }
+
+        /// <summary>
+        /// Writes the attached property LetterSpacing to the given element.
+        /// </summary>
+        /// <param name="control">The element to which to write the attached property.</param>
+        /// <param name="letterSpacing">The property value to set</param>
+        public static void SetLetterSpacing(Control control, double letterSpacing)
+        {
+            if (control == null)
+            {
+                throw new ArgumentNullException(nameof(control));
+            }
+
+            control.SetValue(LetterSpacingProperty, letterSpacing);
+        }
+
+        /// <summary>
+        /// Reads the attached property from the given element
+        /// </summary>
+        /// <param name="control">The element to which to read the attached property.</param>
         public static int GetMaxLines(Control control)
         {
             if (control == null)
@@ -506,7 +550,6 @@ namespace Avalonia.Controls
 
             control.SetValue(MaxLinesProperty, maxLines);
         }
-
 
         /// <summary>
         /// Renders the <see cref="TextBlock"/> to a drawing context.
@@ -539,38 +582,51 @@ namespace Avalonia.Controls
                 }
             }
 
-            TextLayout.Draw(context, new Point(padding.Left, top));
+            RenderTextLayout(context, new Point(padding.Left, top));
+        }
+
+        protected virtual void RenderTextLayout(DrawingContext context, Point origin)
+        {
+            TextLayout.Draw(context, origin);
+        }
+
+        protected virtual string? GetText()
+        {
+            return _text ?? Inlines?.Text;
+        }
+
+        protected virtual void SetText(string? text)
+        {
+            if (HasComplexContent)
+            {
+                Inlines?.Clear();
+            }
+           
+            SetAndRaise(TextProperty, ref _text, text);           
         }
 
         /// <summary>
         /// Creates the <see cref="TextLayout"/> used to render the text.
         /// </summary>
-        /// <param name="constraint">The constraint of the text.</param>
-        /// <param name="text">The text to format.</param>
         /// <returns>A <see cref="TextLayout"/> object.</returns>
-        protected virtual TextLayout CreateTextLayout(Size constraint, string? text)
+        protected virtual TextLayout CreateTextLayout(string? text)
         {
+            var typeface = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
+
             var defaultProperties = new GenericTextRunProperties(
-                new Typeface(FontFamily, FontStyle, FontWeight, FontStretch),
+                typeface,
                 FontSize,
                 TextDecorations,
                 Foreground);
 
             var paragraphProperties = new GenericTextParagraphProperties(FlowDirection, TextAlignment, true, false,
-                defaultProperties, TextWrapping, LineHeight, 0);
+                defaultProperties, TextWrapping, LineHeight, 0, LetterSpacing);
 
             ITextSource textSource;
 
-            if (Inlines.HasComplexContent)
+            if (_textRuns != null)
             {
-                var textRuns = new List<TextRun>();
-
-                foreach (var inline in Inlines)
-                {
-                    inline.BuildTextRun(textRuns);
-                }
-
-                textSource = new InlinesTextSource(textRuns);
+                textSource = new InlinesTextSource(_textRuns);
             }
             else
             {
@@ -581,8 +637,8 @@ namespace Avalonia.Controls
                 textSource,
                 paragraphProperties,
                 TextTrimming,
-                constraint.Width,
-                constraint.Height,
+                _constraint.Width,
+                _constraint.Height,
                 maxLines: MaxLines,
                 lineHeight: LineHeight);
         }
@@ -594,16 +650,13 @@ namespace Avalonia.Controls
         {
             _textLayout = null;
 
+            InvalidateVisual();
+
             InvalidateMeasure();
         }
 
         protected override Size MeasureOverride(Size availableSize)
         {
-            if (!Inlines.HasComplexContent && string.IsNullOrEmpty(Text))
-            {
-                return new Size();
-            }
-
             var scale = LayoutHelper.GetLayoutScale(this);
 
             var padding = LayoutHelper.RoundLayoutThickness(Padding, scale, scale);
@@ -612,7 +665,46 @@ namespace Avalonia.Controls
 
             _textLayout = null;
 
-            InvalidateArrange();
+            var inlines = Inlines;
+
+            if (HasComplexContent)
+            {
+                if (_textRuns != null)
+                {
+                    foreach (var textRun in _textRuns)
+                    {
+                        if (textRun is EmbeddedControlRun controlRun &&
+                            controlRun.Control is Control control)
+                        {
+                            VisualChildren.Remove(control);
+
+                            LogicalChildren.Remove(control);
+                        }
+                    }
+                }
+
+                var textRuns = new List<TextRun>();
+
+                foreach (var inline in inlines!)
+                {
+                    inline.BuildTextRun(textRuns);
+                }
+
+                foreach (var textRun in textRuns)
+                {
+                    if (textRun is EmbeddedControlRun controlRun &&
+                        controlRun.Control is Control control)
+                    {
+                        VisualChildren.Add(control);
+
+                        LogicalChildren.Add(control);
+
+                        control.Measure(Size.Infinity);
+                    }
+                }
+
+                _textRuns = textRuns;
+            }
 
             var measuredSize = TextLayout.Bounds.Size.Inflate(padding);
 
@@ -621,19 +713,46 @@ namespace Avalonia.Controls
 
         protected override Size ArrangeOverride(Size finalSize)
         {
-            if(finalSize.Width < TextLayout.Bounds.Width)
+            var textWidth = Math.Ceiling(TextLayout.Bounds.Width);
+
+            if (finalSize.Width < textWidth)
             {
-                finalSize = finalSize.WithWidth(TextLayout.Bounds.Width);
+                finalSize = finalSize.WithWidth(textWidth);
             }
 
-            if (MathUtilities.AreClose(_constraint.Width, finalSize.Width))
-            {
-                return finalSize;
-            }
+            var scale = LayoutHelper.GetLayoutScale(this);
 
-            _constraint = new Size(finalSize.Width, double.PositiveInfinity);
+            var padding = LayoutHelper.RoundLayoutThickness(Padding, scale, scale);
+
+            _constraint = new Size(Math.Ceiling(finalSize.Deflate(padding).Width), double.PositiveInfinity);
 
             _textLayout = null;
+
+            if (HasComplexContent)
+            {
+                var currentY = padding.Top;
+
+                foreach (var textLine in TextLayout.TextLines)
+                {
+                    var currentX = padding.Left + textLine.Start;
+
+                    foreach (var run in textLine.TextRuns)
+                    {
+                        if (run is DrawableTextRun drawable)
+                        {
+                            if (drawable is EmbeddedControlRun controlRun
+                                && controlRun.Control is Control control)
+                            {
+                                control.Arrange(new Rect(new Point(currentX, currentY), control.DesiredSize));
+                            }
+
+                            currentX += drawable.Size.Width;
+                        }
+                    }
+
+                    currentY += textLine.Height;
+                }
+            }
 
             return finalSize;
         }
@@ -643,53 +762,64 @@ namespace Avalonia.Controls
             return new TextBlockAutomationPeer(this);
         }
 
-        private static bool IsValidMaxLines(int maxLines) => maxLines >= 0;
-
-        private static bool IsValidLineHeight(double lineHeight) => double.IsNaN(lineHeight) || lineHeight > 0;
-
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
 
             switch (change.Property.Name)
             {
-                case nameof (FontSize):
-                case nameof (FontWeight):
-                case nameof (FontStyle):
-                case nameof (FontFamily):
-                case nameof (FontStretch):
+                case nameof(FontSize):
+                case nameof(FontWeight):
+                case nameof(FontStyle):
+                case nameof(FontFamily):
+                case nameof(FontStretch):
 
-                case nameof (TextWrapping):
-                case nameof (TextTrimming):
-                case nameof (TextAlignment):
+                case nameof(TextWrapping):
+                case nameof(TextTrimming):
+                case nameof(TextAlignment):
 
-                case nameof (FlowDirection):
+                case nameof(FlowDirection):
 
                 case nameof (Padding):
                 case nameof (LineHeight):
+                case nameof (LetterSpacing):
                 case nameof (MaxLines):
 
-                case nameof (Text):
-                case nameof (TextDecorations):
-                case nameof (Foreground):
-                {
-                    InvalidateTextLayout();
-                    break;
-                }
+                case nameof(Text):
+                case nameof(TextDecorations):
+                case nameof(Foreground):
+                    {
+                        InvalidateTextLayout();
+                        break;
+                    }
+                case nameof(Inlines):
+                    {
+                        OnInlinesChanged(change.OldValue as InlineCollection, change.NewValue as InlineCollection);
+                        InvalidateTextLayout();
+                        break;
+                    }
             }
         }
 
-        private void InlinesChanged(object? sender, EventArgs e)
-        {
-            InvalidateTextLayout();
-        }
+        private static bool IsValidMaxLines(int maxLines) => maxLines >= 0;
 
-        void IInlineHost.AddVisualChild(IControl child)
+        private static bool IsValidLineHeight(double lineHeight) => double.IsNaN(lineHeight) || lineHeight > 0;
+
+        private void OnInlinesChanged(InlineCollection? oldValue, InlineCollection? newValue)
         {
-            if (child.VisualParent == null)
+            if (oldValue is not null)
             {
-                VisualChildren.Add(child);
-            }            
+                oldValue.LogicalChildren = null;
+                oldValue.InlineHost = null;
+                oldValue.Invalidated -= (s, e) => InvalidateTextLayout();
+            }
+
+            if (newValue is not null)
+            {
+                newValue.LogicalChildren = LogicalChildren;
+                newValue.InlineHost = this;
+                newValue.Invalidated += (s, e) => InvalidateTextLayout();
+            }
         }
 
         void IInlineHost.Invalidate()
@@ -697,39 +827,7 @@ namespace Avalonia.Controls
             InvalidateTextLayout();
         }
 
-        private readonly struct InlinesTextSource : ITextSource
-        {
-            private readonly IReadOnlyList<TextRun> _textRuns;
-
-            public InlinesTextSource(IReadOnlyList<TextRun> textRuns)
-            {
-                _textRuns = textRuns;
-            }
-
-            public TextRun? GetTextRun(int textSourceIndex)
-            {
-                var currentPosition = 0;
-
-                foreach (var textRun in _textRuns)
-                {
-                    if(textRun.TextSourceLength == 0)
-                    {
-                        continue;
-                    }
-
-                    if(currentPosition >= textSourceIndex)
-                    {
-                        return textRun;
-                    }
-
-                    currentPosition += textRun.TextSourceLength;
-                }
-
-                return null;
-            }
-        }
-
-        private readonly struct SimpleTextSource : ITextSource
+        protected readonly struct SimpleTextSource : ITextSource
         {
             private readonly ReadOnlySlice<char> _text;
             private readonly TextRunProperties _defaultProperties;
@@ -744,17 +842,58 @@ namespace Avalonia.Controls
             {
                 if (textSourceIndex > _text.Length)
                 {
-                    return null;
+                    return new TextEndOfParagraph();
                 }
 
                 var runText = _text.Skip(textSourceIndex);
 
                 if (runText.IsEmpty)
                 {
-                    return null;
+                    return new TextEndOfParagraph();
                 }
 
                 return new TextCharacters(runText, _defaultProperties);
+            }
+        }
+
+        private readonly struct InlinesTextSource : ITextSource
+        {
+            private readonly IReadOnlyList<TextRun> _textRuns;
+
+            public InlinesTextSource(IReadOnlyList<TextRun> textRuns)
+            {
+                _textRuns = textRuns;
+            }
+
+            public IReadOnlyList<TextRun> TextRuns => _textRuns;
+
+            public TextRun? GetTextRun(int textSourceIndex)
+            {
+                var currentPosition = 0;
+
+                foreach (var textRun in _textRuns)
+                {
+                    if (textRun.TextSourceLength == 0)
+                    {
+                        continue;
+                    }
+
+                    if (textSourceIndex >= currentPosition + textRun.TextSourceLength)
+                    {
+                        currentPosition += textRun.TextSourceLength;
+
+                        continue;
+                    }
+
+                    if (textRun is TextCharacters)
+                    {
+                        return new TextCharacters(textRun.Text.Skip(Math.Max(0, textSourceIndex - currentPosition)), textRun.Properties!);
+                    }
+
+                    return textRun;
+                }
+
+                return null;
             }
         }
     }

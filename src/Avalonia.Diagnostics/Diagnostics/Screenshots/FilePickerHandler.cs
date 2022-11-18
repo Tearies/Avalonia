@@ -3,6 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Platform.Storage;
+using Avalonia.Platform.Storage.FileIO;
 using Lifetimes = Avalonia.Controls.ApplicationLifetimes;
 
 namespace Avalonia.Diagnostics.Screenshots
@@ -38,7 +40,7 @@ namespace Avalonia.Diagnostics.Screenshots
         /// The default root folder is [Environment.SpecialFolder.MyPictures]/Screenshots.
         /// </summary>
         public string ScreenshotsRoot { get; }
-            = Convetions.DefaultScreenshotsRoot;
+            = Conventions.DefaultScreenshotsRoot;
 
         /// <summary>
         /// SaveFilePicker Title
@@ -56,30 +58,25 @@ namespace Avalonia.Diagnostics.Screenshots
             return window!;
         }
 
-        protected async override Task<Stream?> GetStream(IControl control)
+        protected override async Task<Stream?> GetStream(IControl control)
         {
-            Stream? output = default;
-            var result = await new SaveFileDialog()
+            var result = await GetWindow(control).StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
+                SuggestedStartLocation = new BclStorageFolder(new DirectoryInfo(ScreenshotsRoot)),
                 Title = Title,
-                Filters = new() { new FileDialogFilter() { Name = "PNG", Extensions = new() { "png" } } },
-                Directory = ScreenshotsRoot,
-            }.ShowAsync(GetWindow(control));
-            if (!string.IsNullOrWhiteSpace(result))
+                FileTypeChoices = new FilePickerFileType[] { new FilePickerFileType("PNG") { Patterns = new string[] { "*.png" } } },
+                DefaultExtension = ".png"
+            });
+            if (result is null)
             {
-                var foldler = Path.GetDirectoryName(result);
-                // Directory information for path, or null if path denotes a root directory or is
-                // null. Returns System.String.Empty if path does not contain directory information.
-                if (!string.IsNullOrWhiteSpace(foldler))
-                {
-                    if (!Directory.Exists(foldler))
-                    {
-                        Directory.CreateDirectory(foldler);
-                    }
-                    output = new FileStream(result, FileMode.Create);
-                }
+                return null;
             }
-            return output;
+            if (!result.CanOpenWrite)
+            {
+                throw new InvalidOperationException("ReadOnly file was opened");
+            }
+
+            return await result.OpenWriteAsync();
         }
     }
 }

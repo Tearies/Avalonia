@@ -94,10 +94,18 @@ namespace Avalonia.Controls.Primitives
                 ColorSpectrumShape.Box);
 
         /// <summary>
+        /// Defines the <see cref="ThirdComponent"/> property.
+        /// </summary>
+        public static readonly StyledProperty<ColorComponent> ThirdComponentProperty =
+            AvaloniaProperty.Register<ColorSpectrum, ColorComponent>(
+                nameof(ThirdComponent),
+                ColorComponent.Component3); // Value
+
+        /// <summary>
         /// Gets or sets the currently selected color in the RGB color model.
         /// </summary>
         /// <remarks>
-        /// For control authors use <see cref="HsvColor"/> instead to avoid loss
+        /// For control authors, use <see cref="HsvColor"/> instead to avoid loss
         /// of precision and color drifting.
         /// </remarks>
         public Color Color
@@ -217,6 +225,22 @@ namespace Avalonia.Controls.Primitives
         {
             get => GetValue(ShapeProperty);
             set => SetValue(ShapeProperty, value);
+        }
+
+        /// <summary>
+        /// Gets the third HSV color component that is NOT displayed by the spectrum.
+        /// This is automatically calculated from the <see cref="Components"/> property.
+        /// </summary>
+        /// <remarks>
+        /// This property should be used for any external color slider that represents the
+        /// third component of the color. Note that this property uses the generic
+        /// <see cref="ColorComponent"/> type instead of the more accurate <see cref="HsvComponent"/>
+        /// to allow direct usage by the generalized color sliders.
+        /// </remarks>
+        public ColorComponent ThirdComponent
+        {
+            get => GetValue(ThirdComponentProperty);
+            protected set => SetValue(ThirdComponentProperty, value);
         }
     }
 }

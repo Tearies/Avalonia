@@ -12,7 +12,7 @@ namespace Avalonia.Skia.UnitTests.Media.TextFormatting
 {
     public class TextLineTests
     {
-        private static readonly string s_multiLineText = "012345678\r\r0123456789";
+        private const string s_multiLineText = "012345678\r\r0123456789";
 
         [Fact]
         public void Should_Get_First_CharacterHit()
@@ -543,11 +543,164 @@ namespace Avalonia.Skia.UnitTests.Media.TextFormatting
             }
         }
 
+        [Fact]
+        public void Should_Get_Distance_From_CharacterHit_Mixed_TextBuffer()
+        {
+            using (Start())
+            {
+                var defaultProperties = new GenericTextRunProperties(Typeface.Default);
+                var textSource = new MixedTextBufferTextSource();
+
+                var formatter = new TextFormatterImpl();
+
+                var textLine =
+                    formatter.FormatLine(textSource, 0, double.PositiveInfinity,
+                        new GenericTextParagraphProperties(defaultProperties));
+
+                var distance = textLine.GetDistanceFromCharacterHit(new CharacterHit(10));
+
+                Assert.Equal(72.01171875, distance);
+
+                distance = textLine.GetDistanceFromCharacterHit(new CharacterHit(20));
+
+                Assert.Equal(144.0234375, distance);
+
+                distance = textLine.GetDistanceFromCharacterHit(new CharacterHit(30));
+
+                Assert.Equal(216.03515625, distance);
+
+                distance = textLine.GetDistanceFromCharacterHit(new CharacterHit(40));
+
+                Assert.Equal(textLine.WidthIncludingTrailingWhitespace, distance);
+            }
+        }
+
+        [Fact]
+        public void Should_Get_TextBounds_From_Mixed_TextBuffer()
+        {
+            using (Start())
+            {
+                var defaultProperties = new GenericTextRunProperties(Typeface.Default);
+                var textSource = new MixedTextBufferTextSource();
+
+                var formatter = new TextFormatterImpl();
+
+                var textLine =
+                    formatter.FormatLine(textSource, 0, double.PositiveInfinity,
+                        new GenericTextParagraphProperties(defaultProperties));
+
+                var textBounds = textLine.GetTextBounds(0, 10);
+
+                Assert.Equal(1, textBounds.Count);
+
+                Assert.Equal(72.01171875, textBounds[0].Rectangle.Width);
+
+                textBounds = textLine.GetTextBounds(0, 20);
+
+                Assert.Equal(2, textBounds.Count);
+
+                Assert.Equal(144.0234375, textBounds.Sum(x => x.Rectangle.Width));
+
+                textBounds = textLine.GetTextBounds(0, 30);
+
+                Assert.Equal(3, textBounds.Count);
+
+                Assert.Equal(216.03515625, textBounds.Sum(x => x.Rectangle.Width));
+
+                textBounds = textLine.GetTextBounds(0, 40);
+
+                Assert.Equal(4, textBounds.Count);
+
+                Assert.Equal(textLine.WidthIncludingTrailingWhitespace, textBounds.Sum(x => x.Rectangle.Width));
+            }
+        }
+
+        [Fact]
+        public void Should_GetTextRange()
+        {
+            var text = "שדגככעיחדגכAישדגשדגחייטYDASYWIWחיחלדשSAטויליHUHIUHUIDWKLאא'ק'קחליק/'וקןגגגלךשף'/קפוכדגכשדגשיח'/קטאגשד";
+
+            using (Start())
+            {
+                var defaultProperties = new GenericTextRunProperties(Typeface.Default);
+
+                var textSource = new SingleBufferTextSource(text, defaultProperties);
+
+                var formatter = new TextFormatterImpl();
+
+                var textLine =
+                    formatter.FormatLine(textSource, 0, double.PositiveInfinity,
+                        new GenericTextParagraphProperties(defaultProperties));
+
+                var textRuns = textLine.TextRuns.Cast<ShapedTextCharacters>().ToList();
+
+                var lineWidth = textLine.WidthIncludingTrailingWhitespace;
+
+                var textBounds = textLine.GetTextBounds(0, text.Length);
+
+                TextBounds lastBounds = null;
+
+                var runBounds = textBounds.SelectMany(x => x.TextRunBounds).ToList();
+
+                Assert.Equal(textRuns.Count, runBounds.Count);
+
+                for (var i = 0; i < textRuns.Count; i++)
+                {
+                    var run = textRuns[i];
+                    var bounds = runBounds[i];
+
+                    Assert.Equal(run.Text.Start, bounds.TextSourceCharacterIndex);
+                    Assert.Equal(run, bounds.TextRun);
+                    Assert.Equal(run.Size.Width, bounds.Rectangle.Width);
+                }
+
+                for (var i = 0; i < textBounds.Count; i++)
+                {
+                    var currentBounds = textBounds[i];
+
+                    if (lastBounds != null)
+                    {
+                        Assert.Equal(lastBounds.Rectangle.Right, currentBounds.Rectangle.Left);
+                    }
+
+                    var sumOfRunWidth = currentBounds.TextRunBounds.Sum(x => x.Rectangle.Width);
+
+                    Assert.Equal(sumOfRunWidth, currentBounds.Rectangle.Width);
+
+                    lastBounds = currentBounds;
+                }
+
+                var sumOfBoundsWidth = textBounds.Sum(x => x.Rectangle.Width);
+
+                Assert.Equal(lineWidth, sumOfBoundsWidth);
+            }
+        }
+
+        private class MixedTextBufferTextSource : ITextSource
+        {
+            public TextRun? GetTextRun(int textSourceIndex)
+            {
+                switch (textSourceIndex)
+                {
+                    case 0:
+                        return new TextCharacters(new ReadOnlySlice<char>("aaaaaaaaaa".AsMemory()), new GenericTextRunProperties(Typeface.Default));
+                    case 10:
+                        return new TextCharacters(new ReadOnlySlice<char>("bbbbbbbbbb".AsMemory()), new GenericTextRunProperties(Typeface.Default));
+                    case 20:
+                        return new TextCharacters(new ReadOnlySlice<char>("cccccccccc".AsMemory()), new GenericTextRunProperties(Typeface.Default));
+                    case 30:
+                        return new TextCharacters(new ReadOnlySlice<char>("dddddddddd".AsMemory()), new GenericTextRunProperties(Typeface.Default));
+                    default:
+                        return null;
+                }
+            }
+        }
+
         private class DrawableRunTextSource : ITextSource
         {
             const string Text = "_A_A";
 
-            public TextRun? GetTextRun(int textSourceIndex)
+            public TextRun GetTextRun(int textSourceIndex)
             {
                 switch (textSourceIndex)
                 {
@@ -687,7 +840,7 @@ namespace Avalonia.Skia.UnitTests.Media.TextFormatting
 
                 var textBounds = textLine.GetTextBounds(0, text.Length * 3 + 3);
 
-                Assert.Equal(1, textBounds.Count);
+                Assert.Equal(6, textBounds.Count);
                 Assert.Equal(textLine.WidthIncludingTrailingWhitespace, textBounds.Sum(x => x.Rectangle.Width));
 
                 textBounds = textLine.GetTextBounds(0, 1);
@@ -697,8 +850,8 @@ namespace Avalonia.Skia.UnitTests.Media.TextFormatting
 
                 textBounds = textLine.GetTextBounds(0, firstRun.Text.Length + 1);
 
-                Assert.Equal(1, textBounds.Count);
-                Assert.Equal(firstRun.Size.Width + 14, textBounds[0].Rectangle.Width);
+                Assert.Equal(2, textBounds.Count);
+                Assert.Equal(firstRun.Size.Width + 14, textBounds.Sum(x => x.Rectangle.Width));
 
                 textBounds = textLine.GetTextBounds(1, firstRun.Text.Length);
 
@@ -707,44 +860,107 @@ namespace Avalonia.Skia.UnitTests.Media.TextFormatting
 
                 textBounds = textLine.GetTextBounds(1, firstRun.Text.Length + 1);
 
-                Assert.Equal(1, textBounds.Count);
-                Assert.Equal(firstRun.Size.Width + 14, textBounds[0].Rectangle.Width);
+                Assert.Equal(2, textBounds.Count);
+                Assert.Equal(firstRun.Size.Width + 14, textBounds.Sum(x => x.Rectangle.Width));
             }
         }
 
         [Fact]
-        public void Should_Get_TextBounds_BiDi()
+        public void Should_Get_TextBounds_BiDi_LeftToRight()
         {
             using (Start())
             {
                 var defaultProperties = new GenericTextRunProperties(Typeface.Default);
-                var text = "0123".AsMemory();
-                var ltrOptions = new TextShaperOptions(Typeface.Default.GlyphTypeface, 10, 0, CultureInfo.CurrentCulture);
-                var rtlOptions = new TextShaperOptions(Typeface.Default.GlyphTypeface, 10, 1, CultureInfo.CurrentCulture);
-
-                var textRuns = new List<TextRun>
-                {
-                    new ShapedTextCharacters(TextShaper.Current.ShapeText(new ReadOnlySlice<char>(text), ltrOptions), defaultProperties),
-                    new ShapedTextCharacters(TextShaper.Current.ShapeText(new ReadOnlySlice<char>(text, text.Length, text.Length), ltrOptions), defaultProperties),
-                    new ShapedTextCharacters(TextShaper.Current.ShapeText(new ReadOnlySlice<char>(text, text.Length * 2, text.Length), rtlOptions), defaultProperties),
-                    new ShapedTextCharacters(TextShaper.Current.ShapeText(new ReadOnlySlice<char>(text, text.Length * 3, text.Length), ltrOptions), defaultProperties)
-                };
-
-
-                var textSource = new FixedRunsTextSource(textRuns);
+                var text = "אאא AAA";
+                var textSource = new SingleBufferTextSource(text, defaultProperties);
 
                 var formatter = new TextFormatterImpl();
 
                 var textLine =
-                    formatter.FormatLine(textSource, 0, double.PositiveInfinity,
-                        new GenericTextParagraphProperties(defaultProperties));
+                    formatter.FormatLine(textSource, 0, 200,
+                        new GenericTextParagraphProperties(FlowDirection.LeftToRight, TextAlignment.Left, 
+                        true, true, defaultProperties, TextWrapping.NoWrap, 0, 0, 0));
 
-                var textBounds = textLine.GetTextBounds(0, text.Length * 4);
+                var textBounds = textLine.GetTextBounds(0, 3);
 
-                Assert.Equal(3, textBounds.Count);
+                var firstRun = textLine.TextRuns[0] as ShapedTextCharacters;
+
+                Assert.Equal(1, textBounds.Count);
+                Assert.Equal(firstRun.Size.Width, textBounds.Sum(x => x.Rectangle.Width));
+
+                textBounds = textLine.GetTextBounds(3, 4);
+
+                var secondRun = textLine.TextRuns[1] as ShapedTextCharacters;
+
+                Assert.Equal(1, textBounds.Count);
+                Assert.Equal(secondRun.Size.Width, textBounds.Sum(x => x.Rectangle.Width));
+
+                textBounds = textLine.GetTextBounds(0, 4);
+
+                Assert.Equal(2, textBounds.Count);
+
+                Assert.Equal(firstRun.Size.Width, textBounds[0].Rectangle.Width);           
+
+                Assert.Equal(7.201171875, textBounds[1].Rectangle.Width);
+
+                Assert.Equal(firstRun.Size.Width, textBounds[1].Rectangle.Left);             
+
+                textBounds = textLine.GetTextBounds(0, text.Length);
+
+                Assert.Equal(2, textBounds.Count);
                 Assert.Equal(textLine.WidthIncludingTrailingWhitespace, textBounds.Sum(x => x.Rectangle.Width));
             }
         }
+
+        [Fact]
+        public void Should_Get_TextBounds_BiDi_RightToLeft()
+        {
+            using (Start())
+            {
+                var defaultProperties = new GenericTextRunProperties(Typeface.Default);
+                var text = "אאא AAA";
+                var textSource = new SingleBufferTextSource(text, defaultProperties);
+
+                var formatter = new TextFormatterImpl();
+
+                var textLine =
+                    formatter.FormatLine(textSource, 0, 200,
+                        new GenericTextParagraphProperties(FlowDirection.RightToLeft, TextAlignment.Left, 
+                        true, true, defaultProperties, TextWrapping.NoWrap, 0, 0, 0));
+
+                var textBounds = textLine.GetTextBounds(0, 4);
+
+                var secondRun = textLine.TextRuns[1] as ShapedTextCharacters;
+
+                Assert.Equal(1, textBounds.Count);
+                Assert.Equal(secondRun.Size.Width, textBounds.Sum(x => x.Rectangle.Width));
+
+                textBounds = textLine.GetTextBounds(4, 3);
+
+                var firstRun = textLine.TextRuns[0] as ShapedTextCharacters;
+
+                Assert.Equal(1, textBounds.Count);
+
+                Assert.Equal(3, textBounds[0].TextRunBounds.Sum(x=> x.Length));
+                Assert.Equal(firstRun.Size.Width, textBounds.Sum(x => x.Rectangle.Width));
+
+                textBounds = textLine.GetTextBounds(0, 5);
+
+                Assert.Equal(2, textBounds.Count);
+                Assert.Equal(5, textBounds.Sum(x=> x.TextRunBounds.Sum(x => x.Length)));
+
+                Assert.Equal(secondRun.Size.Width, textBounds[1].Rectangle.Width);
+                Assert.Equal(7.201171875, textBounds[0].Rectangle.Width);
+                Assert.Equal(textLine.Start + 7.201171875, textBounds[0].Rectangle.Right);
+                Assert.Equal(textLine.Start + firstRun.Size.Width, textBounds[1].Rectangle.Left);
+
+                textBounds = textLine.GetTextBounds(0, text.Length);
+
+                Assert.Equal(2, textBounds.Count);
+                Assert.Equal(7, textBounds.Sum(x => x.TextRunBounds.Sum(x => x.Length)));
+                Assert.Equal(textLine.WidthIncludingTrailingWhitespace, textBounds.Sum(x => x.Rectangle.Width));
+            }
+        }       
 
         private class FixedRunsTextSource : ITextSource
         {
@@ -755,7 +971,7 @@ namespace Avalonia.Skia.UnitTests.Media.TextFormatting
                 _textRuns = textRuns;
             }
 
-            public TextRun? GetTextRun(int textSourceIndex)
+            public TextRun GetTextRun(int textSourceIndex)
             {
                 var currentPosition = 0;
 

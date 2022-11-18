@@ -2,6 +2,7 @@
 using Avalonia.Controls.Metadata;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Utilities;
 
 namespace Avalonia.Controls.Primitives
@@ -20,14 +21,36 @@ namespace Avalonia.Controls.Primitives
         /// </summary>
         public event EventHandler<ColorChangedEventArgs>? ColorChanged;
 
-        private const double MaxHue = 359.99999999999999999; // 17 decimal places
-        private bool disableUpdates = false;
+        /// <summary>
+        /// Defines the maximum hue component value
+        /// (other components are always 0..100 or 0.255).
+        /// </summary>
+        /// <remarks>
+        /// This should match the default <see cref="ColorSpectrum.MaxHue"/> property.
+        /// </remarks>
+        private const double MaxHue = 359;
+
+        protected bool ignorePropertyChanged = false;
+
+        private WriteableBitmap? _backgroundBitmap;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ColorSlider"/> class.
         /// </summary>
         public ColorSlider() : base()
         {
+        }
+
+        /// <inheritdoc/>
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnDetachedFromVisualTree(e);
         }
 
         /// <summary>
@@ -90,7 +113,7 @@ namespace Avalonia.Controls.Primitives
 
             if (pixelWidth != 0 && pixelHeight != 0)
             {
-                var bitmap = await ColorPickerHelpers.CreateComponentBitmapAsync(
+                ArrayList<byte> bgraPixelData = await ColorPickerHelpers.CreateComponentBitmapAsync(
                     pixelWidth,
                     pixelHeight,
                     Orientation,
@@ -100,11 +123,44 @@ namespace Avalonia.Controls.Primitives
                     IsAlphaMaxForced,
                     IsSaturationValueMaxForced);
 
-                if (bitmap != null)
+                if (bgraPixelData != null)
                 {
-                    Background = new ImageBrush(ColorPickerHelpers.CreateBitmapFromPixelData(bitmap, pixelWidth, pixelHeight));
+                    if (_backgroundBitmap != null)
+                    {
+                        // TODO: CURRENTLY DISABLED DUE TO INTERMITTENT CRASHES IN SKIA/RENDERER
+                        //
+                        // Re-use the existing WriteableBitmap
+                        // This assumes the height, width and byte counts are the same and must be set to null
+                        // elsewhere if that assumption is ever not true.
+                        // ColorPickerHelpers.UpdateBitmapFromPixelData(_backgroundBitmap, bgraPixelData);
+
+                        // TODO: ALSO DISABLED DISPOSE DUE TO INTERMITTENT CRASHES
+                        //_backgroundBitmap?.Dispose();
+                        _backgroundBitmap = ColorPickerHelpers.CreateBitmapFromPixelData(bgraPixelData, pixelWidth, pixelHeight);
+                    }
+                    else
+                    {
+                        _backgroundBitmap = ColorPickerHelpers.CreateBitmapFromPixelData(bgraPixelData, pixelWidth, pixelHeight);
+                    }
+
+                    Background = new ImageBrush(_backgroundBitmap);
                 }
             }
+        }
+
+        /// <summary>
+        /// Rounds the component values of the given <see cref="HsvColor"/>.
+        /// This is useful for user-display and to ensure a color matches user selection exactly.
+        /// </summary>
+        /// <param name="hsvColor">The <see cref="HsvColor"/> to round component values for.</param>
+        /// <returns>A new <see cref="HsvColor"/> with rounded component values.</returns>
+        private HsvColor RoundComponentValues(HsvColor hsvColor)
+        {
+            return new HsvColor(
+                Math.Round(hsvColor.A, 2, MidpointRounding.AwayFromZero),
+                Math.Round(hsvColor.H, 0, MidpointRounding.AwayFromZero),
+                Math.Round(hsvColor.S, 2, MidpointRounding.AwayFromZero),
+                Math.Round(hsvColor.V, 2, MidpointRounding.AwayFromZero));
         }
 
         /// <summary>
@@ -112,16 +168,21 @@ namespace Avalonia.Controls.Primitives
         /// </summary>
         /// <remarks>
         /// Warning: This will trigger property changed updates.
-        /// Consider using <see cref="disableUpdates"/> externally.
+        /// Consider using <see cref="ignorePropertyChanged"/> externally.
         /// </remarks>
         private void SetColorToSliderValues()
         {
-            var hsvColor = HsvColor;
-            var rgbColor = Color;
             var component = ColorComponent;
 
             if (ColorModel == ColorModel.Hsva)
             {
+                var hsvColor = HsvColor;
+
+                if (IsRoundingEnabled)
+                {
+                    hsvColor = RoundComponentValues(hsvColor);
+                }
+
                 // Note: Components converted into a usable range for the user
                 switch (component)
                 {
@@ -149,6 +210,8 @@ namespace Avalonia.Controls.Primitives
             }
             else
             {
+                var rgbColor = Color;
+
                 switch (component)
                 {
                     case ColorComponent.Alpha:
@@ -183,13 +246,12 @@ namespace Avalonia.Controls.Primitives
             HsvColor hsvColor = new HsvColor();
             Color rgbColor = new Color();
             double sliderPercent = Value / (Maximum - Minimum);
-
-            var baseHsvColor = HsvColor;
-            var baseRgbColor = Color;
             var component = ColorComponent;
 
             if (ColorModel == ColorModel.Hsva)
             {
+                var baseHsvColor = HsvColor;
+
                 switch (component)
                 {
                     case ColorComponent.Alpha:
@@ -214,10 +276,12 @@ namespace Avalonia.Controls.Primitives
                     }
                 }
 
-                return (hsvColor.ToRgb(), hsvColor);
+                rgbColor = hsvColor.ToRgb();
             }
             else
             {
+                var baseRgbColor = Color;
+
                 byte componentValue = Convert.ToByte(MathUtilities.Clamp(sliderPercent * 255, 0, 255));
 
                 switch (component)
@@ -236,8 +300,15 @@ namespace Avalonia.Controls.Primitives
                         break;
                 }
 
-                return (rgbColor, rgbColor.ToHsv());
+                hsvColor = rgbColor.ToHsv();
             }
+
+            if (IsRoundingEnabled)
+            {
+                hsvColor = RoundComponentValues(hsvColor);
+            }
+
+            return (rgbColor, hsvColor);
         }
 
         /// <summary>
@@ -306,63 +377,78 @@ namespace Avalonia.Controls.Primitives
         /// <inheritdoc/>
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
-            if (disableUpdates)
+            if (ignorePropertyChanged)
             {
                 base.OnPropertyChanged(change);
                 return;
             }
 
-            // Always keep the two color properties in sync
             if (change.Property == ColorProperty)
             {
-                disableUpdates = true;
+                ignorePropertyChanged = true;
 
+                // Always keep the two color properties in sync
                 HsvColor = Color.ToHsv();
 
-                if (IsAutoUpdatingEnabled)
-                {
-                    SetColorToSliderValues();
-                    UpdateBackground();
-                }
-
+                SetColorToSliderValues();
+                UpdateBackground();
                 UpdatePseudoClasses();
+
                 OnColorChanged(new ColorChangedEventArgs(
                     change.GetOldValue<Color>(),
                     change.GetNewValue<Color>()));
 
-                disableUpdates = false;
+                ignorePropertyChanged = false;
+            }
+            else if (change.Property == ColorComponentProperty ||
+                     change.Property == ColorModelProperty ||
+                     change.Property == IsAlphaMaxForcedProperty ||
+                     change.Property == IsSaturationValueMaxForcedProperty)
+            {
+                ignorePropertyChanged = true;
+
+                SetColorToSliderValues();
+                UpdateBackground();
+                UpdatePseudoClasses();
+
+                ignorePropertyChanged = false;
             }
             else if (change.Property == HsvColorProperty)
             {
-                disableUpdates = true;
+                ignorePropertyChanged = true;
 
+                // Always keep the two color properties in sync
                 Color = HsvColor.ToRgb();
 
-                if (IsAutoUpdatingEnabled)
-                {
-                    SetColorToSliderValues();
-                    UpdateBackground();
-                }
-
+                SetColorToSliderValues();
+                UpdateBackground();
                 UpdatePseudoClasses();
+
                 OnColorChanged(new ColorChangedEventArgs(
                     change.GetOldValue<HsvColor>().ToRgb(),
                     change.GetNewValue<HsvColor>().ToRgb()));
 
-                disableUpdates = false;
+                ignorePropertyChanged = false;
+            }
+            else if (change.Property == IsRoundingEnabledProperty)
+            {
+                SetColorToSliderValues();
             }
             else if (change.Property == BoundsProperty)
             {
-                if (IsAutoUpdatingEnabled)
-                {
-                    UpdateBackground();
-                }
+                // If the control's overall dimensions have changed the background bitmap size also needs to change.
+                // This means the existing bitmap must be released to be recreated correctly in UpdateBackground().
+                _backgroundBitmap?.Dispose();
+                _backgroundBitmap = null;
+
+                UpdateBackground();
+                UpdatePseudoClasses();
             }
             else if (change.Property == ValueProperty ||
                      change.Property == MinimumProperty ||
                      change.Property == MaximumProperty)
             {
-                disableUpdates = true;
+                ignorePropertyChanged = true;
 
                 Color oldColor = Color;
                 (var color, var hsvColor) = GetColorFromSliderValues();
@@ -381,7 +467,7 @@ namespace Avalonia.Controls.Primitives
                 UpdatePseudoClasses();
                 OnColorChanged(new ColorChangedEventArgs(oldColor, Color));
 
-                disableUpdates = false;
+                ignorePropertyChanged = false;
             }
 
             base.OnPropertyChanged(change);

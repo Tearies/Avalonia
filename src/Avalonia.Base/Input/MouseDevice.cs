@@ -21,49 +21,11 @@ namespace Avalonia.Input
 
         private readonly Pointer _pointer;
         private bool _disposed;
-        private PixelPoint? _position;
         private MouseButton _lastMouseDownButton;
 
         public MouseDevice(Pointer? pointer = null)
         {
             _pointer = pointer ?? new Pointer(Pointer.GetNextFreeId(), PointerType.Mouse, true);
-        }
-
-        [Obsolete("Use IPointer instead")]
-        public IInputElement? Captured => _pointer.Captured;
-
-        [Obsolete("Use events instead")]
-        public PixelPoint Position
-        {
-            get => _position ?? new PixelPoint(-1, -1);
-            protected set => _position = value;
-        }
-
-        [Obsolete("Use IPointer instead")]
-        public void Capture(IInputElement? control)
-        {
-            _pointer.Capture(control);
-        }
-
-        /// <summary>
-        /// Gets the mouse position relative to a control.
-        /// </summary>
-        /// <param name="relativeTo">The control.</param>
-        /// <returns>The mouse position in the control's coordinates.</returns>
-        public Point GetPosition(IVisual relativeTo)
-        {
-            relativeTo = relativeTo ?? throw new ArgumentNullException(nameof(relativeTo));
-
-            if (relativeTo.VisualRoot == null)
-            {
-                throw new InvalidOperationException("Control is not attached to visual tree.");
-            }
-
-#pragma warning disable CS0618 // Type or member is obsolete
-            var rootPoint = relativeTo.VisualRoot.PointToClient(Position);
-#pragma warning restore CS0618 // Type or member is obsolete
-            var transform = relativeTo.VisualRoot.TransformToVisual(relativeTo);
-            return rootPoint * transform!.Value;
         }
 
         public void ProcessRawEvent(RawInputEventArgs e)
@@ -96,7 +58,6 @@ namespace Avalonia.Input
             if(mouse._disposed)
                 return;
 
-            _position = e.Root.PointToScreen(e.Position);
             var props = CreateProperties(e);
             var keyModifiers = e.InputModifiers.ToKeyModifiers();
             switch (e.Type)
@@ -145,7 +106,6 @@ namespace Avalonia.Input
 
         private void LeaveWindow()
         {
-            _position = null;
         }
 
         PointerPointProperties CreateProperties(RawPointerEventArgs args)
@@ -167,9 +127,9 @@ namespace Avalonia.Input
                 _pointer.Capture(source);
                 if (source != null)
                 {
-                    var settings = AvaloniaLocator.Current.GetService<IPlatformSettings>();
-                    var doubleClickTime = settings?.DoubleClickTime.TotalMilliseconds ?? 500;
-                    var doubleClickSize = settings?.DoubleClickSize ?? new Size(4, 4);
+                    var settings = AvaloniaLocator.Current.GetRequiredService<IPlatformSettings>();
+                    var doubleClickTime = settings.GetDoubleTapTime(PointerType.Mouse).TotalMilliseconds;
+                    var doubleClickSize = settings.GetDoubleTapSize(PointerType.Mouse);
 
                     if (!_lastClickRect.Contains(p) || timestamp - _lastClickTime > doubleClickTime)
                     {
@@ -236,17 +196,11 @@ namespace Avalonia.Input
             PointerPointProperties props,
             Vector delta, KeyModifiers inputModifiers, IInputElement? hitTest)
         {
+            var rawDelta = delta;
             device = device ?? throw new ArgumentNullException(nameof(device));
             root = root ?? throw new ArgumentNullException(nameof(root));
 
             var source = _pointer.Captured ?? hitTest;
-
-            // KeyModifiers.Shift should scroll in horizontal direction. This does not work on every platform. 
-            // If Shift-Key is pressed and X is close to 0 we swap the Vector.
-            if (inputModifiers == KeyModifiers.Shift && MathUtilities.IsZero(delta.X))
-            {
-                delta = new Vector(delta.Y, delta.X);
-            }
 
             if (source is not null)
             {
@@ -324,19 +278,7 @@ namespace Avalonia.Input
             _disposed = true;
             _pointer?.Dispose();
         }
-
-        [Obsolete]
-        public void TopLevelClosed(IInputRoot root)
-        {
-            // no-op
-        }
-
-        [Obsolete]
-        public void SceneInvalidated(IInputRoot root, Rect rect)
-        {
-            // no-op
-        }
-
+        
         public IPointer? TryGetPointer(RawPointerEventArgs ev)
         {
             return _pointer;

@@ -1,9 +1,11 @@
 <UserControl x:Class="ControlCatalog.MainView"
              xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:controls="clr-namespace:ControlSamples;assembly=ControlSamples"
-             xmlns:pages="clr-namespace:ControlCatalog.Pages"
-             xmlns:models="clr-namespace:ControlCatalog.Models">
+             xmlns:controls="using:ControlSamples"
+             xmlns:models="using:ControlCatalog.Models"
+             xmlns:pages="using:ControlCatalog.Pages"
+             xmlns:viewModels="using:ControlCatalog.ViewModels"
+             x:DataType="viewModels:MainWindowViewModel">
   <Grid>
     <Grid.Styles>
       <Style Selector="TextBlock.h2">
@@ -12,9 +14,15 @@
         <Setter Property="HorizontalAlignment" Value="Left" />
       </Style>
     </Grid.Styles>
-    <controls:HamburgerMenu Name="Sidebar">
+      <controls:HamburgerMenu Name="Sidebar">
+        <TabItem Header="Composition">
+        <pages:CompositionPage/>
+      </TabItem>
       <TabItem Header="Acrylic">
         <pages:AcrylicPage />
+      </TabItem>
+      <TabItem Header="AdornerLayer">
+        <pages:AdornerLayerPage />
       </TabItem>
       <TabItem Header="AutoCompleteBox">
         <pages:AutoCompleteBoxPage />
@@ -69,6 +77,9 @@
       <TabItem Header="CalendarDatePicker">
         <pages:CalendarDatePickerPage />
       </TabItem>
+      <TabItem Header="Dialogs">
+        <pages:DialogsPage />
+      </TabItem>
       <TabItem Header="Drag+Drop">
         <pages:DragAndDropPage />
       </TabItem>
@@ -109,7 +120,10 @@
       <TabItem Header="OpenGL">
         <pages:OpenGlPage />
       </TabItem>
-      <TabItem Header="Pointers (Touch)">
+      <TabItem Header="Platform Information">
+        <pages:PlatformInfoPage />
+      </TabItem>
+      <TabItem Header="Pointers">
         <pages:PointersPage />
       </TabItem>
       <TabItem Header="ProgressBar">
@@ -121,7 +135,7 @@
       <TabItem Header="RelativePanel">
         <pages:RelativePanelPage />
       </TabItem>
-      <TabItem Header="ScrollViewer">
+        <TabItem Header="ScrollViewer">
         <pages:ScrollViewerPage />
       </TabItem>
       <TabItem Header="Slider">
@@ -157,6 +171,9 @@
       <TabItem Header="Viewbox">
         <pages:ViewboxPage />
       </TabItem>
+      <TabItem Header="Native Embed">
+        <pages:NativeEmbedPage />
+      </TabItem>
       <TabItem Header="Window Customizations">
         <pages:WindowCustomizationsPage />
       </TabItem>
@@ -178,8 +195,8 @@
               <ComboBox.Items>
                 <models:CatalogTheme>FluentLight</models:CatalogTheme>
                 <models:CatalogTheme>FluentDark</models:CatalogTheme>
-                <models:CatalogTheme>DefaultLight</models:CatalogTheme>
-                <models:CatalogTheme>DefaultDark</models:CatalogTheme>
+                <models:CatalogTheme>SimpleLight</models:CatalogTheme>
+                <models:CatalogTheme>SimpleDark</models:CatalogTheme>
               </ComboBox.Items>
             </ComboBox>
             <ComboBox x:Name="TransparencyLevels"

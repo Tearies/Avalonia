@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Platform;
 using Avalonia.Controls.Primitives.PopupPositioning;
 using Avalonia.LogicalTree;
+using Avalonia.Metadata;
 using Avalonia.Platform;
 using Avalonia.Styling;
 using Avalonia.Win32.Interop;
@@ -14,8 +15,11 @@ using static Avalonia.Win32.Interop.UnmanagedMethods;
 
 namespace Avalonia.Win32
 {
+    [Unstable]
     public class TrayIconImpl : ITrayIconImpl
     {
+        private static readonly IntPtr s_emptyIcon = new System.Drawing.Bitmap(32, 32).GetHicon();
+        
         private readonly int _uniqueId;
         private static int s_nextUniqueId;
         private bool _iconAdded;
@@ -84,7 +88,7 @@ namespace Avalonia.Win32
                 uID = _uniqueId,
                 uFlags = NIF.TIP | NIF.MESSAGE,
                 uCallbackMessage = (int)CustomWindowsMessage.WM_TRAYMOUSE,
-                hIcon = _icon?.HIcon ?? new IconImpl(new System.Drawing.Bitmap(32, 32)).HIcon,
+                hIcon = _icon?.HIcon ?? s_emptyIcon,
                 szTip = _tooltipText ?? ""
             };
 
@@ -193,7 +197,7 @@ namespace Avalonia.Win32
                 ShowActivated = true;
             }
 
-            private void TrayPopupRoot_Deactivated(object sender, EventArgs e)
+            private void TrayPopupRoot_Deactivated(object? sender, EventArgs e)
             {
                 Close();
             }
@@ -212,7 +216,7 @@ namespace Avalonia.Win32
                 {
                     Anchor = PopupAnchor.TopLeft,
                     Gravity = PopupGravity.BottomRight,
-                    AnchorRectangle = new Rect(Position.ToPoint(1) / Screens.Primary.PixelDensity, new Size(1, 1)),
+                    AnchorRectangle = new Rect(Position.ToPoint(1) / Screens.Primary.Scaling, new Size(1, 1)),
                     Size = finalRect.Size,
                     ConstraintAdjustment = PopupPositionerConstraintAdjustment.FlipX | PopupPositionerConstraintAdjustment.FlipY,
                 });
@@ -240,16 +244,16 @@ namespace Avalonia.Win32
                     {
                         var point = _hiddenWindow.Screens.Primary.Bounds.TopLeft;
                         var size = _hiddenWindow.Screens.Primary.Bounds.Size;
-                        return new Rect(point.X, point.Y, size.Width * _hiddenWindow.Screens.Primary.PixelDensity, size.Height * _hiddenWindow.Screens.Primary.PixelDensity);
+                        return new Rect(point.X, point.Y, size.Width * _hiddenWindow.Screens.Primary.Scaling, size.Height * _hiddenWindow.Screens.Primary.Scaling);
                     }
                 }
 
                 public void MoveAndResize(Point devicePoint, Size virtualSize)
                 {
-                    _moveResize(new PixelPoint((int)devicePoint.X, (int)devicePoint.Y), virtualSize, _hiddenWindow.Screens.Primary.PixelDensity);
+                    _moveResize(new PixelPoint((int)devicePoint.X, (int)devicePoint.Y), virtualSize, _hiddenWindow.Screens.Primary.Scaling);
                 }
 
-                public double Scaling => _hiddenWindow.Screens.Primary.PixelDensity;
+                public double Scaling => _hiddenWindow.Screens.Primary.Scaling;
             }
         }
 

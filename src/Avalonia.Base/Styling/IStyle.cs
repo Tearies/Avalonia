@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using Avalonia.Controls;
-
-#nullable enable
+using Avalonia.Metadata;
 
 namespace Avalonia.Styling
 {
     /// <summary>
     /// Defines the interface for styles.
     /// </summary>
+    [NotClientImplementable]
     public interface IStyle : IResourceNode
     {
         /// <summary>
@@ -23,6 +23,6 @@ namespace Avalonia.Styling
         /// <returns>
         /// A <see cref="SelectorMatchResult"/> describing how the style matches the control.
         /// </returns>
-        SelectorMatchResult TryAttach(IStyleable target, IStyleHost? host);
+        SelectorMatchResult TryAttach(IStyleable target, object? host);
     }
 }

@@ -82,13 +82,27 @@ ComPtr<IAvnApplicationEvents> _events;
         _isHandlingSendEvent = oldHandling;
     }
 }
+
+// This is needed for certain embedded controls DO NOT REMOVE..
+- (BOOL) isHandlingSendEvent
+{
+    return _isHandlingSendEvent;
+}
+
+- (void)setHandlingSendEvent:(BOOL)handlingSendEvent
+{
+    _isHandlingSendEvent = handlingSendEvent;
+}
 @end
 
-extern void InitializeAvnApp(IAvnApplicationEvents* events)
+extern void InitializeAvnApp(IAvnApplicationEvents* events, bool disableAppDelegate)
 {
-    NSApplication* app = [AvnApplication sharedApplication];
-    id delegate = [[AvnAppDelegate alloc] initWithEvents:events];
-    [app setDelegate:delegate];
+    if(!disableAppDelegate)
+    {
+        NSApplication* app = [AvnApplication sharedApplication];
+        id delegate = [[AvnAppDelegate alloc] initWithEvents:events];
+        [app setDelegate:delegate];
+    }
 }
 
 HRESULT AvnApplicationCommands::HideApp()
