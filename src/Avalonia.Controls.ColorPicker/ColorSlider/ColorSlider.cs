@@ -41,18 +41,6 @@ namespace Avalonia.Controls.Primitives
         {
         }
 
-        /// <inheritdoc/>
-        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
-        {
-            base.OnAttachedToVisualTree(e);
-        }
-
-        /// <inheritdoc/>
-        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
-        {
-            base.OnDetachedFromVisualTree(e);
-        }
-
         /// <summary>
         /// Updates the visual state of the control by applying latest PseudoClasses.
         /// </summary>
@@ -108,8 +96,22 @@ namespace Avalonia.Controls.Primitives
             // independent pixels of controls.
 
             var scale = LayoutHelper.GetLayoutScale(this);
-            var pixelWidth = Convert.ToInt32(Bounds.Width * scale);
-            var pixelHeight = Convert.ToInt32(Bounds.Height * scale);
+            int pixelWidth;
+            int pixelHeight;
+
+            if (base._track != null)
+            {
+                pixelWidth = Convert.ToInt32(base._track.Bounds.Width * scale);
+                pixelHeight = Convert.ToInt32(base._track.Bounds.Height * scale);
+            }
+            else
+            {
+                // As a fallback, attempt to calculate using the overall control size
+                // This shouldn't happen as a track is a required template part of a slider
+                // However, if it does, the spectrum will still be shown
+                pixelWidth = Convert.ToInt32(Bounds.Width * scale);
+                pixelHeight = Convert.ToInt32(Bounds.Height * scale);
+            }
 
             if (pixelWidth != 0 && pixelHeight != 0)
             {
@@ -123,28 +125,25 @@ namespace Avalonia.Controls.Primitives
                     IsAlphaMaxForced,
                     IsSaturationValueMaxForced);
 
-                if (bgraPixelData != null)
+                if (_backgroundBitmap != null)
                 {
-                    if (_backgroundBitmap != null)
-                    {
-                        // TODO: CURRENTLY DISABLED DUE TO INTERMITTENT CRASHES IN SKIA/RENDERER
-                        //
-                        // Re-use the existing WriteableBitmap
-                        // This assumes the height, width and byte counts are the same and must be set to null
-                        // elsewhere if that assumption is ever not true.
-                        // ColorPickerHelpers.UpdateBitmapFromPixelData(_backgroundBitmap, bgraPixelData);
+                    // TODO: CURRENTLY DISABLED DUE TO INTERMITTENT CRASHES IN SKIA/RENDERER
+                    //
+                    // Re-use the existing WriteableBitmap
+                    // This assumes the height, width and byte counts are the same and must be set to null
+                    // elsewhere if that assumption is ever not true.
+                    // ColorPickerHelpers.UpdateBitmapFromPixelData(_backgroundBitmap, bgraPixelData);
 
-                        // TODO: ALSO DISABLED DISPOSE DUE TO INTERMITTENT CRASHES
-                        //_backgroundBitmap?.Dispose();
-                        _backgroundBitmap = ColorPickerHelpers.CreateBitmapFromPixelData(bgraPixelData, pixelWidth, pixelHeight);
-                    }
-                    else
-                    {
-                        _backgroundBitmap = ColorPickerHelpers.CreateBitmapFromPixelData(bgraPixelData, pixelWidth, pixelHeight);
-                    }
-
-                    Background = new ImageBrush(_backgroundBitmap);
+                    // TODO: ALSO DISABLED DISPOSE DUE TO INTERMITTENT CRASHES
+                    //_backgroundBitmap?.Dispose();
+                    _backgroundBitmap = ColorPickerHelpers.CreateBitmapFromPixelData(bgraPixelData, pixelWidth, pixelHeight);
                 }
+                else
+                {
+                    _backgroundBitmap = ColorPickerHelpers.CreateBitmapFromPixelData(bgraPixelData, pixelWidth, pixelHeight);
+                }
+
+                Background = new ImageBrush(_backgroundBitmap);
             }
         }
 
@@ -154,7 +153,7 @@ namespace Avalonia.Controls.Primitives
         /// </summary>
         /// <param name="hsvColor">The <see cref="HsvColor"/> to round component values for.</param>
         /// <returns>A new <see cref="HsvColor"/> with rounded component values.</returns>
-        private HsvColor RoundComponentValues(HsvColor hsvColor)
+        private static HsvColor RoundComponentValues(HsvColor hsvColor)
         {
             return new HsvColor(
                 Math.Round(hsvColor.A, 2, MidpointRounding.AwayFromZero),
@@ -388,7 +387,7 @@ namespace Avalonia.Controls.Primitives
                 ignorePropertyChanged = true;
 
                 // Always keep the two color properties in sync
-                HsvColor = Color.ToHsv();
+                SetCurrentValue(HsvColorProperty, Color.ToHsv());
 
                 SetColorToSliderValues();
                 UpdateBackground();
@@ -418,7 +417,7 @@ namespace Avalonia.Controls.Primitives
                 ignorePropertyChanged = true;
 
                 // Always keep the two color properties in sync
-                Color = HsvColor.ToRgb();
+                SetCurrentValue(ColorProperty, HsvColor.ToRgb());
 
                 SetColorToSliderValues();
                 UpdateBackground();
@@ -455,13 +454,13 @@ namespace Avalonia.Controls.Primitives
 
                 if (ColorModel == ColorModel.Hsva)
                 {
-                    HsvColor = hsvColor;
-                    Color = hsvColor.ToRgb();
+                    SetCurrentValue(HsvColorProperty, hsvColor);
+                    SetCurrentValue(ColorProperty, hsvColor.ToRgb());
                 }
                 else
                 {
-                    Color = color;
-                    HsvColor = color.ToHsv();
+                    SetCurrentValue(ColorProperty, color);
+                    SetCurrentValue(HsvColorProperty, color.ToHsv());
                 }
 
                 UpdatePseudoClasses();

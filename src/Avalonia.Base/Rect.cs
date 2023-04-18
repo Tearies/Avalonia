@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Numerics;
 using Avalonia.Animation.Animators;
 using Avalonia.Utilities;
 
@@ -14,11 +15,6 @@ namespace Avalonia
         {
             Animation.Animation.RegisterAnimator<RectAnimator>(prop => typeof(Rect).IsAssignableFrom(prop.PropertyType));
         }
-
-        /// <summary>
-        /// An empty rectangle.
-        /// </summary>
-        public static readonly Rect Empty = default(Rect);
 
         /// <summary>
         /// The X position.
@@ -169,13 +165,6 @@ namespace Avalonia
         public Point Center => new Point(_x + (_width / 2), _y + (_height / 2));
 
         /// <summary>
-        /// Gets a value that indicates whether the rectangle is empty.
-        /// </summary>
-        // ReSharper disable CompareOfFloatsByEqualityOperator
-        public bool IsEmpty => _width == 0 && _height == 0;
-        // ReSharper restore CompareOfFloatsByEqualityOperator
-
-        /// <summary>
         /// Checks for equality between two <see cref="Rect"/>s.
         /// </summary>
         /// <param name="left">The first rect.</param>
@@ -243,7 +232,7 @@ namespace Avalonia
         }
 
         /// <summary>
-        /// Determines whether a point in in the bounds of the rectangle.
+        /// Determines whether a point is in the bounds of the rectangle.
         /// </summary>
         /// <param name="p">The point.</param>
         /// <returns>true if the point is in the bounds of the rectangle; otherwise false.</returns>
@@ -390,7 +379,7 @@ namespace Avalonia
             }
             else
             {
-                return Empty;
+                return default;
             }
         }
 
@@ -436,6 +425,32 @@ namespace Avalonia
 
             return new Rect(new Point(left, top), new Point(right, bottom));
         }
+        
+        internal Rect TransformToAABB(Matrix4x4 matrix)
+        {
+            ReadOnlySpan<Point> points = stackalloc Point[4]
+            {
+                TopLeft.Transform(matrix),
+                TopRight.Transform(matrix),
+                BottomRight.Transform(matrix),
+                BottomLeft.Transform(matrix)
+            };
+
+            var left = double.MaxValue;
+            var right = double.MinValue;
+            var top = double.MaxValue;
+            var bottom = double.MinValue;
+
+            foreach (var p in points)
+            {
+                if (p.X < left) left = p.X;
+                if (p.X > right) right = p.X;
+                if (p.Y < top) top = p.Y;
+                if (p.Y > bottom) bottom = p.Y;
+            }
+
+            return new Rect(new Point(left, top), new Point(right, bottom));
+        }
 
         /// <summary>
         /// Translates the rectangle by an offset.
@@ -457,13 +472,13 @@ namespace Avalonia
 		/// </remarks>
 		public Rect Normalize()
         {
-            Rect rect = this;            
+            Rect rect = this;
 
             if(double.IsNaN(rect.Right) || double.IsNaN(rect.Bottom) || 
                 double.IsNaN(rect.X) || double.IsNaN(rect.Y) || 
                 double.IsNaN(Height) || double.IsNaN(Width))
             {
-                return Rect.Empty;
+                return default;
             }
 
             if (rect.Width < 0)
@@ -485,19 +500,18 @@ namespace Avalonia
             return rect;
         }
 
-
-            /// <summary>
-            /// Gets the union of two rectangles.
-            /// </summary>
-            /// <param name="rect">The other rectangle.</param>
-            /// <returns>The union.</returns>
-            public Rect Union(Rect rect)
+        /// <summary>
+        /// Gets the union of two rectangles.
+        /// </summary>
+        /// <param name="rect">The other rectangle.</param>
+        /// <returns>The union.</returns>
+        public Rect Union(Rect rect)
         {
-            if (IsEmpty)
+            if (Width == 0 && Height == 0)
             {
                 return rect;
             }
-            else if (rect.IsEmpty)
+            else if (rect.Width == 0 && rect.Height == 0)
             {
                 return this;
             }
@@ -510,6 +524,15 @@ namespace Avalonia
 
                 return new Rect(new Point(x1, y1), new Point(x2, y2));
             }
+        }
+
+        internal static Rect? Union(Rect? left, Rect? right)
+        {
+            if (left == null)
+                return right;
+            if (right == null)
+                return left;
+            return left.Value.Union(right.Value);
         }
 
         /// <summary>

@@ -42,7 +42,8 @@
                               Grid.Column="2"
                               Margin="{TemplateBinding Padding}"
                               VerticalAlignment="Center"
-                              Content="{TemplateBinding Header}">
+                              Content="{TemplateBinding Header}"
+                              ContentTemplate="{TemplateBinding HeaderTemplate}">
               <ContentPresenter.DataTemplates>
                 <DataTemplate DataType="sys:String">
                   <AccessText Text="{Binding}" />
@@ -64,7 +65,7 @@
                    IsLightDismissEnabled="False"
                    IsOpen="{TemplateBinding IsSubMenuOpen,
                                             Mode=TwoWay}"
-                   PlacementMode="Right">
+                   Placement="RightEdgeAlignedTop">
               <Border Background="{DynamicResource ThemeBackgroundBrush}"
                       BorderBrush="{DynamicResource ThemeBorderMidBrush}"
                       BorderThickness="{TemplateBinding BorderThickness}">
@@ -72,8 +73,6 @@
                   <ItemsPresenter Name="PART_ItemsPresenter"
                                   Margin="2"
                                   Grid.IsSharedSizeScope="True"
-                                  ItemTemplate="{TemplateBinding ItemTemplate}"
-                                  Items="{TemplateBinding Items}"
                                   ItemsPanel="{TemplateBinding ItemsPanel}" />
                 </ScrollViewer>
               </Border>

@@ -26,7 +26,7 @@ namespace Avalonia.Controls
         /// <summary>
         /// Defines the <see cref="Child"/> property
         /// </summary>
-        public static readonly StyledProperty<IControl?> ChildProperty =
+        public static readonly StyledProperty<Control?> ChildProperty =
             Decorator.ChildProperty.AddOwner<Viewbox>();
 
         static Viewbox()
@@ -36,6 +36,9 @@ namespace Avalonia.Controls
             AffectsMeasure<Viewbox>(StretchProperty, StretchDirectionProperty);
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Viewbox"/> class.
+        /// </summary>
         public Viewbox()
         {
             // The Child control is hosted inside a ViewboxContainer control so that the transform
@@ -69,7 +72,7 @@ namespace Avalonia.Controls
         /// Gets or sets the child of the Viewbox
         /// </summary>
         [Content]
-        public IControl? Child
+        public Control? Child
         {
             get => GetValue(ChildProperty);
             set => SetValue(ChildProperty, value);
@@ -85,13 +88,14 @@ namespace Avalonia.Controls
             set => _containerVisual.RenderTransform = value;
         }
 
+        /// <inheritdoc />
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
 
             if (change.Property == ChildProperty)
             {
-                var (oldChild, newChild) = change.GetOldAndNewValue<IControl>();
+                var (oldChild, newChild) = change.GetOldAndNewValue<Control?>();
 
                 if (oldChild is not null)
                 {
@@ -111,41 +115,33 @@ namespace Avalonia.Controls
             }
         }
 
+        /// <inheritdoc />
         protected override Size MeasureOverride(Size availableSize)
         {
             var child = _containerVisual;
 
-            if (child != null)
-            {
-                child.Measure(Size.Infinity);
+            child.Measure(Size.Infinity);
 
-                var childSize = child.DesiredSize;
+            var childSize = child.DesiredSize;
 
-                var size = Stretch.CalculateSize(availableSize, childSize, StretchDirection);
+            var size = Stretch.CalculateSize(availableSize, childSize, StretchDirection);
 
-                return size;
-            }
-
-            return new Size();
+            return size;
         }
 
+        /// <inheritdoc />
         protected override Size ArrangeOverride(Size finalSize)
         {
             var child = _containerVisual;
 
-            if (child != null)
-            {
-                var childSize = child.DesiredSize;
-                var scale = Stretch.CalculateScaling(finalSize, childSize, StretchDirection);
+            var childSize = child.DesiredSize;
+            var scale = Stretch.CalculateScaling(finalSize, childSize, StretchDirection);
 
-                InternalTransform = new ImmutableTransform(Matrix.CreateScale(scale.X, scale.Y));
+            InternalTransform = new ImmutableTransform(Matrix.CreateScale(scale.X, scale.Y));
 
-                child.Arrange(new Rect(childSize));
+            child.Arrange(new Rect(childSize));
 
-                return childSize * scale;
-            }
-
-            return finalSize;
+            return childSize * scale;
         }
 
         /// <summary>
@@ -153,9 +149,9 @@ namespace Avalonia.Controls
         /// </summary>
         private class ViewboxContainer : Control
         {
-            private IControl? _child;
+            private Control? _child;
 
-            public IControl? Child
+            public Control? Child
             {
                 get => _child;
                 set

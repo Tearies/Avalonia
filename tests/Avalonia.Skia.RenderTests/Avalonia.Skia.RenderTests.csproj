@@ -2,12 +2,16 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <DefineConstants>AVALONIA_SKIA;AVALONIA_SKIA_SKIP_FAIL</DefineConstants>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\Avalonia.RenderTests\**\*.cs" />
+    <Compile Update="..\Avalonia.RenderTests\Media\EffectTests.cs">
+      <Link>Media\EffectTests.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="..\Avalonia.RenderTests\**\*.ttf" />
+    <EmbeddedResource Include="..\Avalonia.RenderTests\*\*.ttf" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Markup\Avalonia.Markup.Xaml\Avalonia.Markup.Xaml.csproj" />
@@ -16,6 +20,7 @@
     <ProjectReference Include="..\..\src\Avalonia.Controls\Avalonia.Controls.csproj" />
     <ProjectReference Include="..\..\src\Avalonia.Themes.Simple\Avalonia.Themes.Simple.csproj" />
     <ProjectReference Include="..\..\src\Skia\Avalonia.Skia\Avalonia.Skia.csproj" />
+    <ProjectReference Include="..\Avalonia.UnitTests\Avalonia.UnitTests.csproj" />
   </ItemGroup>
   <Import Project="..\..\build\Moq.props" />
   <Import Project="..\..\build\Rx.props" />

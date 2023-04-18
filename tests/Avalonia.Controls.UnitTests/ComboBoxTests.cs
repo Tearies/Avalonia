@@ -23,7 +23,7 @@ namespace Avalonia.Controls.UnitTests
         {
             var target = new ComboBox
             {
-                Items = new[] { "Foo", "Bar" },
+                ItemsSource = new[] { "Foo", "Bar" },
             };
 
             _helper.Down(target);
@@ -43,7 +43,7 @@ namespace Avalonia.Controls.UnitTests
         {
             var target = new ComboBox
             {
-                Items = new[] { "Foo", "Bar" },
+                ItemsSource = new[] { "Foo", "Bar" },
             };
 
             _helper.Down(target);
@@ -66,21 +66,20 @@ namespace Avalonia.Controls.UnitTests
         {
             using (UnitTestApplication.Start(TestServices.RealFocus))
             {
-                var items = new[]
-                {
-                    new ComboBoxItem() { Content = "bla" },
-                    new ComboBoxItem() { Content = "dd" },
-                    new ComboBoxItem() { Content = "sdf", IsEnabled = false }
-                };
                 var target = new ComboBox
                 {
-                    Items = items,
+                    Items =
+                    {
+                        new ComboBoxItem() { Content = "bla" },
+                        new ComboBoxItem() { Content = "dd" },
+                        new ComboBoxItem() { Content = "sdf", IsEnabled = false }
+                    },
                     Template = GetTemplate(),
                     WrapSelection = true
                 };
                 var root = new TestRoot(target);
                 target.ApplyTemplate();
-                target.Presenter.ApplyTemplate();
+                ((Control)target.Presenter).ApplyTemplate();
                 target.Focus();
                 Assert.Equal(target.SelectedIndex, -1);
                 Assert.True(target.IsFocused);
@@ -104,20 +103,19 @@ namespace Avalonia.Controls.UnitTests
         {
             using (UnitTestApplication.Start(TestServices.RealFocus))
             {
-                var items = new[]
-                {
-                    new ComboBoxItem() { Content = "bla" },
-                    new ComboBoxItem() { Content = "dd", IsEnabled = false },
-                    new ComboBoxItem() { Content = "sdf" }
-                };
                 var target = new ComboBox
                 {
-                    Items = items,
+                    Items =
+                    {
+                        new ComboBoxItem() { Content = "bla" },
+                        new ComboBoxItem() { Content = "dd", IsEnabled = false },
+                        new ComboBoxItem() { Content = "sdf" }
+                    },
                     Template = GetTemplate()
                 };
                 var root = new TestRoot(target);
                 target.ApplyTemplate();
-                target.Presenter.ApplyTemplate();
+                ((Control)target.Presenter).ApplyTemplate();
                 target.Focus();
                 Assert.Equal(target.SelectedIndex, -1);
                 Assert.True(target.IsFocused);
@@ -139,10 +137,9 @@ namespace Avalonia.Controls.UnitTests
         [Fact]
         public void SelectionBoxItem_Is_Rectangle_With_VisualBrush_When_Selection_Is_Control()
         {
-            var items = new[] { new Canvas() };
             var target = new ComboBox
             {
-                Items = items,
+                Items = { new Canvas() },
                 SelectedIndex = 0,
             };
             var root = new TestRoot(target);
@@ -152,7 +149,7 @@ namespace Avalonia.Controls.UnitTests
 
             var brush = rectangle.Fill as VisualBrush;
             Assert.NotNull(brush);
-            Assert.Same(items[0], brush.Visual);
+            Assert.Same(target.Items[0], brush.Visual);
         }
 
         [Fact]
@@ -160,14 +157,14 @@ namespace Avalonia.Controls.UnitTests
         {
             var target = new ComboBox
             {
-                Items = new[] { new Canvas() },
+                Items = { new Canvas() },
                 SelectedIndex = 0,
                 Template = GetTemplate(),
             };
 
             var root = new TestRoot { Child = target };
             target.ApplyTemplate();
-            target.Presenter.ApplyTemplate();
+            ((Control)target.Presenter).ApplyTemplate();
 
             var rectangle = target.GetValue(ComboBox.SelectionBoxItemProperty) as Rectangle;
             Assert.True(((ILogical)target).IsAttachedToLogicalTree);
@@ -181,7 +178,7 @@ namespace Avalonia.Controls.UnitTests
             Assert.False(((ILogical)rectangle).IsAttachedToLogicalTree);
         }
 
-        private FuncControlTemplate GetTemplate()
+        private static FuncControlTemplate GetTemplate()
         {
             return new FuncControlTemplate<ComboBox>((parent, scope) =>
             {
@@ -204,7 +201,6 @@ namespace Avalonia.Controls.UnitTests
                             Child = new ItemsPresenter
                             {
                                 Name = "PART_ItemsPresenter",
-                                [!ItemsPresenter.ItemsProperty] = parent[!ComboBox.ItemsProperty],
                             }.RegisterInNameScope(scope)
                         }.RegisterInNameScope(scope)
                     }
@@ -219,7 +215,7 @@ namespace Avalonia.Controls.UnitTests
             {
                 var target = new ComboBox
                 {
-                    Items = new[] { new Canvas() },
+                    Items = { new Canvas() },
                     SelectedIndex = 0,
                     Template = GetTemplate(),
                 };
@@ -258,7 +254,7 @@ namespace Avalonia.Controls.UnitTests
                 var target = new ComboBox
                 {
                     Template = GetTemplate(),                    
-                    Items = items.Select(x => new ComboBoxItem { Content = x })
+                    ItemsSource = items.Select(x => new ComboBoxItem { Content = x })
                 };
 
                 target.ApplyTemplate();
@@ -286,7 +282,6 @@ namespace Avalonia.Controls.UnitTests
                 var target = new ComboBox
                 {
                     Template = GetTemplate(),
-                    VirtualizationMode =  ItemVirtualizationMode.None
                 };
 
                 target.ApplyTemplate();
@@ -328,7 +323,7 @@ namespace Avalonia.Controls.UnitTests
 
                 var target = new ComboBox
                 {
-                    Items = new[] { new Canvas() },
+                    Items = { new Canvas() },
                     SelectedIndex = 0,
                     Template = GetTemplate(),
                 };
@@ -365,17 +360,16 @@ namespace Avalonia.Controls.UnitTests
         [Fact]
         public void FlowDirection_Of_RectangleContent_Shuold_Be_LeftToRight()
         {
-            var items = new[]
-            {
-                new ComboBoxItem()
-                { 
-                    Content = new Control()
-                }
-            };
             var target = new ComboBox
             {
                 FlowDirection = FlowDirection.RightToLeft,
-                Items = items,
+                Items =
+                {
+                    new ComboBoxItem()
+                    {
+                        Content = new Control()
+                    }
+                },
                 Template = GetTemplate()
             };
 
@@ -395,16 +389,15 @@ namespace Avalonia.Controls.UnitTests
             {
                 Child = new Control()
             };
-            var items = new[]
-            { 
-                new ComboBoxItem()
-                {
-                    Content = parentContent.Child
-                }
-            };
             var target = new ComboBox
             {
-                Items = items,
+                Items = 
+                {
+                    new ComboBoxItem()
+                    {
+                        Content = parentContent.Child
+                    }
+                },
                 Template = GetTemplate()
             };
 
@@ -430,17 +423,16 @@ namespace Avalonia.Controls.UnitTests
                 {
                     Child = new Control()
                 };
-                var items = new[]
-                { 
-                    new ComboBoxItem()
-                    {
-                        Content = parentContent.Child
-                    }
-                };
                 var target = new ComboBox
                 {
                     FlowDirection = FlowDirection.RightToLeft,
-                    Items = items,
+                    Items =
+                    {
+                        new ComboBoxItem()
+                        {
+                            Content = parentContent.Child
+                        }
+                    },
                     Template = GetTemplate()
                 };
 

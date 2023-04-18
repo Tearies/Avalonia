@@ -4,9 +4,12 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Primitives.PopupPositioning;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using Microsoft.CodeAnalysis;
 
@@ -20,6 +23,10 @@ namespace IntegrationTestApp
             InitializeViewMenu();
             InitializeGesturesTab();
             this.AttachDevTools();
+
+            var overlayPopups = this.Get<TextBlock>("AppOverlayPopups");
+            overlayPopups.Text = Program.OverlayPopups ? "Overlay Popups" : "Native Popups";
+
             AddHandler(Button.ClickEvent, OnButtonClick);
             ListBoxItems = Enumerable.Range(0, 100).Select(x => "Item " + x).ToList();
             DataContext = this;
@@ -61,11 +68,15 @@ namespace IntegrationTestApp
             var locationComboBox = this.GetControl<ComboBox>("ShowWindowLocation");
             var stateComboBox = this.GetControl<ComboBox>("ShowWindowState");
             var size = !string.IsNullOrWhiteSpace(sizeTextBox.Text) ? Size.Parse(sizeTextBox.Text) : (Size?)null;
+            var systemDecorations = this.GetControl<ComboBox>("ShowWindowSystemDecorations");
+            var extendClientArea = this.GetControl<CheckBox>("ShowWindowExtendClientAreaToDecorationsHint");
+            var canResizeCheckBox = this.GetControl<CheckBox>("ShowWindowCanResize");
             var owner = (Window)this.GetVisualRoot()!;
 
             var window = new ShowWindowTest
             {
                 WindowStartupLocation = (WindowStartupLocation)locationComboBox.SelectedIndex,
+                CanResize = canResizeCheckBox.IsChecked.Value,
             };
 
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
@@ -86,6 +97,8 @@ namespace IntegrationTestApp
             }
 
             sizeTextBox.Text = string.Empty;
+            window.ExtendClientAreaToDecorationsHint = extendClientArea.IsChecked ?? false;
+            window.SystemDecorations = (SystemDecorations)systemDecorations.SelectedIndex;
             window.WindowState = (WindowState)stateComboBox.SelectedIndex;
 
             switch (modeComboBox.SelectedIndex)
@@ -100,6 +113,89 @@ namespace IntegrationTestApp
                     window.ShowDialog(owner);
                     break;
             }
+        }
+
+        private void ShowTransparentWindow()
+        {
+            // Show a background window to make sure the color behind the transparent window is
+            // a known color (green).
+            var backgroundWindow = new Window
+            {
+                Title = "Transparent Window Background",
+                Name = "TransparentWindowBackground",
+                Width = 300,
+                Height = 300,
+                Background = Brushes.Green,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+
+            // This is the transparent window with a red circle.
+            var window = new Window
+            {
+                Title = "Transparent Window",
+                Name = "TransparentWindow",
+                SystemDecorations = SystemDecorations.None,
+                Background = Brushes.Transparent,
+                TransparencyLevelHint = WindowTransparencyLevel.Transparent,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Width = 200,
+                Height = 200,
+                Content = new Border
+                {
+                    Background = Brushes.Red,
+                    CornerRadius = new CornerRadius(100),
+                }
+            };
+
+            window.PointerPressed += (_, _) =>
+            {
+                window.Close();
+                backgroundWindow.Close();
+            };
+
+            backgroundWindow.Show(this);
+            window.Show(backgroundWindow);
+        }
+
+        private void ShowTransparentPopup()
+        {
+            var popup = new Popup
+            {
+                WindowManagerAddShadowHint = false,
+                Placement = PlacementMode.AnchorAndGravity,
+                PlacementAnchor = PopupAnchor.Top,
+                PlacementGravity = PopupGravity.Bottom,
+                Width= 200,
+                Height= 200,
+                Child = new Border
+                {
+                    Background = Brushes.Red,
+                    CornerRadius = new CornerRadius(100),
+                }
+            };
+
+            // Show a background window to make sure the color behind the transparent window is
+            // a known color (green).
+            var backgroundWindow = new Window
+            {
+                Title = "Transparent Popup Background",
+                Name = "TransparentPopupBackground",
+                Width = 200,
+                Height = 200,
+                Background = Brushes.Green,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Content = new Border
+                {
+                    Name = "PopupContainer",
+                    Child = popup,
+                    [AutomationProperties.AccessibilityViewProperty] = AccessibilityView.Content,
+                }
+            };
+
+            backgroundWindow.PointerPressed += (_, _) => backgroundWindow.Close();
+            backgroundWindow.Show(this);
+
+            popup.Open();
         }
 
         private void SendToBack()
@@ -174,10 +270,16 @@ namespace IntegrationTestApp
                 this.Get<ListBox>("BasicListBox").SelectedIndex = -1;
             if (source?.Name == "MenuClickedMenuItemReset")
                 this.Get<TextBlock>("ClickedMenuItem").Text = "None";
+            if (source?.Name == "ShowTransparentWindow")
+                ShowTransparentWindow();
+            if (source?.Name == "ShowTransparentPopup")
+                ShowTransparentPopup();
             if (source?.Name == "ShowWindow")
                 ShowWindow();
             if (source?.Name == "SendToBack")
                 SendToBack();
+            if (source?.Name == "EnterFullscreen")
+                WindowState = WindowState.FullScreen;
             if (source?.Name == "ExitFullscreen")
                 WindowState = WindowState.Normal;
             if (source?.Name == "RestoreAll")

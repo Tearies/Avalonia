@@ -28,4 +28,29 @@ namespace Avalonia.Rendering.SceneGraph
         {
         }
     }
+
+    internal abstract class DrawOperationWithTransform : DrawOperation, IDrawOperationWithTransform
+    {
+        protected DrawOperationWithTransform(Rect bounds, Matrix transform) : base(bounds, transform)
+        {
+            Transform = transform;
+        }
+
+        public Matrix Transform { get; }
+
+        public sealed override bool HitTest(Point p)
+        {
+            if (Transform.IsIdentity)
+                return HitTestTransformed(p);
+
+            if (!Transform.HasInverse)
+                return false;
+
+            var transformedPoint = Transform.Invert().Transform(p);
+
+            return HitTestTransformed(transformedPoint);
+        }
+
+        public abstract bool HitTestTransformed(Point p);
+    }
 }

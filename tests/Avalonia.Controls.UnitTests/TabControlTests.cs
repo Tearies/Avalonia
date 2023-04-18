@@ -24,7 +24,7 @@ namespace Avalonia.Controls.UnitTests
             var target = new TabControl
             {
                 Template = TabControlTemplate(),
-                Items = new[]
+                Items =
                 {
                     (selected = new TabItem
                     {
@@ -48,20 +48,16 @@ namespace Avalonia.Controls.UnitTests
         [Fact]
         public void Pre_Selecting_TabItem_Should_Set_SelectedContent_After_It_Was_Added()
         {
+            const string secondContent = "Second";
             var target = new TabControl
             {
                 Template = TabControlTemplate(),
+                Items =
+                {
+                    new TabItem { Header = "First"},
+                    new TabItem { Header = "Second", Content = secondContent, IsSelected = true }
+                },
             };
-
-            const string secondContent = "Second";
-
-            var items = new AvaloniaList<object>
-            {
-                new TabItem { Header = "First"},
-                new TabItem { Header = "Second", Content = secondContent, IsSelected = true }
-            };
-
-            target.Items = items;
 
             ApplyTemplate(target);
 
@@ -71,107 +67,105 @@ namespace Avalonia.Controls.UnitTests
         [Fact]
         public void Logical_Children_Should_Be_TabItems()
         {
-            var items = new[]
-            {
-                new TabItem
-                {
-                    Content = "foo"
-                },
-                new TabItem
-                {
-                    Content = "bar"
-                },
-            };
-
             var target = new TabControl
             {
                 Template = TabControlTemplate(),
-                Items = items,
+                Items =
+                {
+                    new TabItem
+                    {
+                        Content = "foo"
+                    },
+                    new TabItem
+                    {
+                        Content = "bar"
+                    },
+                }
             };
 
-            Assert.Equal(items, target.GetLogicalChildren());
+            Assert.Equal(target.Items, target.GetLogicalChildren().ToList());
             target.ApplyTemplate();
-            Assert.Equal(items, target.GetLogicalChildren());
+            Assert.Equal(target.Items, target.GetLogicalChildren().ToList());
         }
 
         [Fact]
         public void Removal_Should_Set_First_Tab()
         {
-            var collection = new ObservableCollection<TabItem>()
-            {
-                new TabItem
-                {
-                    Name = "first",
-                    Content = "foo",
-                },
-                new TabItem
-                {
-                    Name = "second",
-                    Content = "bar",
-                },
-                new TabItem
-                {
-                    Name = "3rd",
-                    Content = "barf",
-                },
-            };
-
             var target = new TabControl
             {
                 Template = TabControlTemplate(),
-                Items = collection,
+                Items =
+                {
+                    new TabItem
+                    {
+                        Name = "first",
+                        Content = "foo",
+                    },
+                    new TabItem
+                    {
+                        Name = "second",
+                        Content = "bar",
+                    },
+                    new TabItem
+                    {
+                        Name = "3rd",
+                        Content = "barf",
+                    },
+                }
             };
 
             Prepare(target);
-            target.SelectedItem = collection[1];
+            target.SelectedItem = target.Items[1];
 
-            Assert.Same(collection[1], target.SelectedItem);
-            Assert.Equal(collection[1].Content, target.SelectedContent);
+            var item = Assert.IsType<TabItem>(target.Items[1]);
+            Assert.Same(item, target.SelectedItem);
+            Assert.Equal(item.Content, target.SelectedContent);
 
-            collection.RemoveAt(1);
+            target.Items.RemoveAt(1);
 
-            Assert.Same(collection[0], target.SelectedItem);
-            Assert.Equal(collection[0].Content, target.SelectedContent);
+            item = Assert.IsType<TabItem>(target.Items[0]);
+            Assert.Same(item, target.SelectedItem);
+            Assert.Equal(item.Content, target.SelectedContent);
         }
 
         [Fact]
         public void Removal_Should_Set_New_Item0_When_Item0_Selected()
         {
-            var collection = new ObservableCollection<TabItem>()
-            {
-                new TabItem
-                {
-                    Name = "first",
-                    Content = "foo",
-                },
-                new TabItem
-                {
-                    Name = "second",
-                    Content = "bar",
-                },
-                new TabItem
-                {
-                    Name = "3rd",
-                    Content = "barf",
-                },
-            };
-
             var target = new TabControl
             {
                 Template = TabControlTemplate(),
-                Items = collection,
+                Items =
+                {
+                    new TabItem
+                    {
+                        Name = "first",
+                        Content = "foo",
+                    },
+                    new TabItem
+                    {
+                        Name = "second",
+                        Content = "bar",
+                    },
+                    new TabItem
+                    {
+                        Name = "3rd",
+                        Content = "barf",
+                    },
+                }
             };
 
             Prepare(target);
-            target.SelectedItem = collection[0];
+            target.SelectedItem = target.Items[0];
 
-            Assert.Same(collection[0], target.SelectedItem);
-            Assert.Equal(collection[0].Content, target.SelectedContent);
+            var item = Assert.IsType<TabItem>(target.Items[0]);
+            Assert.Same(item, target.SelectedItem);
+            Assert.Equal(item.Content, target.SelectedContent);
 
-            collection.RemoveAt(0);
+            target.Items.RemoveAt(0);
 
-            Assert.Same(collection[0], target.SelectedItem);
-            Assert.Equal(collection[0].Content, target.SelectedContent);
+            item = Assert.IsType<TabItem>(target.Items[0]);
+            Assert.Same(item, target.SelectedItem);
+            Assert.Equal(item.Content, target.SelectedContent);
         }
 
         [Fact]
@@ -189,7 +183,7 @@ namespace Avalonia.Controls.UnitTests
             var target = new TabControl
             {
                 Template = TabControlTemplate(),
-                Items = collection,
+                ItemsSource = collection,
             };
 
             Prepare(target);
@@ -207,49 +201,45 @@ namespace Avalonia.Controls.UnitTests
         [Fact]
         public void TabItem_Templates_Should_Be_Set_Before_TabItem_ApplyTemplate()
         {
-            var collection = new[]
+            var template = new FuncControlTemplate<TabItem>((x, __) => new Decorator());
+            TabControl target;
+            var root = new TestRoot
             {
-                new TabItem
+                Styles =
                 {
-                    Name = "first",
-                    Content = "foo",
+                    new Style(x => x.OfType<TabItem>())
+                    {
+                        Setters =
+                        {
+                            new Setter(TemplatedControl.TemplateProperty, template)
+                        }
+                    }
                 },
-                new TabItem
+                Child = (target = new TabControl
                 {
-                    Name = "second",
-                    Content = "bar",
-                },
-                new TabItem
-                {
-                    Name = "3rd",
-                    Content = "barf",
-                },
+                    Template = TabControlTemplate(),
+                    Items = 
+                    {
+                        new TabItem
+                        {
+                            Name = "first",
+                            Content = "foo",
+                        },
+                        new TabItem
+                        {
+                            Name = "second",
+                            Content = "bar",
+                        },
+                        new TabItem
+                        {
+                            Name = "3rd",
+                            Content = "barf",
+                        },
+                    },
+                })
             };
 
-            var template = new FuncControlTemplate<TabItem>((x, __) => new Decorator());
-
-            using (UnitTestApplication.Start(TestServices.RealStyler))
-            {
-                var root = new TestRoot
-                {
-                    Styles =
-                    {
-                        new Style(x => x.OfType<TabItem>())
-                        {
-                            Setters =
-                            {
-                                new Setter(TemplatedControl.TemplateProperty, template)
-                            }
-                        }
-                    },
-                    Child = new TabControl
-                    {
-                        Template = TabControlTemplate(),
-                        Items = collection,
-                    }
-                };
-            }
-
+            var collection = target.Items.Cast<TabItem>().ToList();
             Assert.Same(collection[0].Template, template);
             Assert.Same(collection[1].Template, template);
             Assert.Same(collection[2].Template, template);
@@ -275,7 +265,7 @@ namespace Avalonia.Controls.UnitTests
                 {
                     new FuncDataTemplate<Item>((x, __) => new Button { Content = x })
                 },
-                Items = items,
+                ItemsSource = items,
             };
 
             ApplyTemplate(target);
@@ -301,7 +291,7 @@ namespace Avalonia.Controls.UnitTests
 
             target.SelectedIndex = 4;
             ((ContentPresenter)target.ContentPart).UpdateChild();
-            dataContext = target.ContentPart.DataContext;
+            dataContext = ((Control)target.ContentPart).DataContext;
             Assert.Equal("Base", dataContext);
         }
 
@@ -317,21 +307,19 @@ namespace Avalonia.Controls.UnitTests
         [Fact]
         public void Non_IHeadered_Control_Items_Should_Be_Ignored()
         {
-            var items = new[]
-            {
-                new TextBlock { Text = "foo" },
-                new TextBlock { Text = "bar" },
-            };
-
             var target = new TabControl
             {
                 Template = TabControlTemplate(),
-                Items = items,
+                Items =
+                {
+                    new TextBlock { Text = "foo" },
+                    new TextBlock { Text = "bar" },
+                },
             };
 
             ApplyTemplate(target);
 
-            var logicalChildren = target.ItemsPresenterPart.Panel.GetLogicalChildren();
+            var logicalChildren = target.GetLogicalChildren();
 
             var result = logicalChildren
                 .OfType<TabItem>()
@@ -347,7 +335,7 @@ namespace Avalonia.Controls.UnitTests
             TabControl target = new TabControl
             {
                 Template = TabControlTemplate(),
-                Items = new[]
+                Items =
                 {
                     new TabItem { Header = "Foo" },
                     new TabItem { Header = "Foo", Content = new Decorator() },
@@ -372,7 +360,7 @@ namespace Avalonia.Controls.UnitTests
                 Template = TabControlTemplate(),
                 ContentTemplate = new FuncDataTemplate<string>((x, _) =>
                     new TextBlock { Tag = "bar", Text = x }),
-                Items = new[] { "Foo" },
+                ItemsSource = new[] { "Foo" },
             };
             var root = new TestRoot(target);
 
@@ -396,7 +384,7 @@ namespace Avalonia.Controls.UnitTests
             {
                 Template = TabControlTemplate(),
                 DataContext = dataContext,
-                Items = new AvaloniaList<object> { tabItem }
+                Items = { tabItem }
             };
 
             ApplyTemplate(target);
@@ -413,7 +401,7 @@ namespace Avalonia.Controls.UnitTests
 <Window xmlns='https://github.com/avaloniaui'
         xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
         xmlns:local='clr-namespace:Avalonia.Markup.Xaml.UnitTests.Xaml;assembly=Avalonia.Markup.Xaml.UnitTests'>
-    <TabControl Name='tabs' Items='{Binding Tabs}'/>
+    <TabControl Name='tabs' ItemsSource='{Binding Tabs}'/>
 </Window>";
                 var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
                 var tabControl = window.FindControl<TabControl>("tabs");
@@ -421,11 +409,11 @@ namespace Avalonia.Controls.UnitTests
                 tabControl.DataContext = new { Tabs = new List<string>() };
                 window.ApplyTemplate();
 
-                Assert.Equal(0, tabControl.Items.Count());
+                Assert.Equal(0, tabControl.ItemsSource.Count());
             }
         }
 
-        private IControlTemplate TabControlTemplate()
+        private static IControlTemplate TabControlTemplate()
         {
             return new FuncControlTemplate<TabControl>((parent, scope) =>
                 new StackPanel
@@ -435,8 +423,6 @@ namespace Avalonia.Controls.UnitTests
                         new ItemsPresenter
                         {
                             Name = "PART_ItemsPresenter",
-                            [!TabStrip.ItemsProperty] = parent[!TabControl.ItemsProperty],
-                            [!TabStrip.ItemTemplateProperty] = parent[!TabControl.ItemTemplateProperty],
                         }.RegisterInNameScope(scope),
                         new ContentPresenter
                         {
@@ -448,7 +434,7 @@ namespace Avalonia.Controls.UnitTests
                 });
         }
 
-        private IControlTemplate TabItemTemplate()
+        private static IControlTemplate TabItemTemplate()
         {
             return new FuncControlTemplate<TabItem>((parent, scope) =>
                 new ContentPresenter
@@ -459,14 +445,14 @@ namespace Avalonia.Controls.UnitTests
                 }.RegisterInNameScope(scope));
         }
 
-        private void Prepare(TabControl target)
+        private static void Prepare(TabControl target)
         {
             ApplyTemplate(target);
             target.Measure(Size.Infinity);
             target.Arrange(new Rect(target.DesiredSize));
         }
 
-        private void ApplyTemplate(TabControl target)
+        private static void ApplyTemplate(TabControl target)
         {
             target.ApplyTemplate();
 

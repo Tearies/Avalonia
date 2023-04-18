@@ -98,11 +98,6 @@ namespace Avalonia
         public double Bottom => _bottom;
 
         /// <summary>
-        /// Gets a value indicating whether all sides are set to 0.
-        /// </summary>
-        public bool IsEmpty => Left.Equals(0) && IsUniform;
-
-        /// <summary>
         /// Gets a value indicating whether all sides are equal.
         /// </summary>
         public bool IsUniform => Left.Equals(Right) && Top.Equals(Bottom) && Right.Equals(Bottom);
@@ -277,7 +272,7 @@ namespace Avalonia
         /// <returns>The string representation of the thickness.</returns>
         public override string ToString()
         {
-            return $"{_left},{_top},{_right},{_bottom}";
+            return FormattableString.Invariant($"{_left},{_top},{_right},{_bottom}");
         }
 
         /// <summary>
@@ -292,15 +287,7 @@ namespace Avalonia
             left = this._left;
             top = this._top;
             right = this._right;
-            bottom = this._bottom;        
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether the left, top, right and bottom thickness values are zero.
-        /// </summary>
-        public bool IsDefault
-        {
-            get { return (_left == 0) && (_top == 0) && (_right == 0) && (_bottom == 0); }
+            bottom = this._bottom;
         }
     }
 }

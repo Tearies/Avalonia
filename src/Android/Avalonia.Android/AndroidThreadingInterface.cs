@@ -1,10 +1,10 @@
 using System;
-using System.Reactive.Disposables;
 using System.Threading;
 
 using Android.OS;
 
 using Avalonia.Platform;
+using Avalonia.Reactive;
 using Avalonia.Threading;
 
 using App = Android.App.Application;
@@ -20,8 +20,6 @@ namespace Avalonia.Android
         {
             _handler = new Handler(App.Context.MainLooper);
         }
-
-        public void RunLoop(CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public IDisposable StartTimer(DispatcherPriority priority, TimeSpan interval, Action tick)
         {

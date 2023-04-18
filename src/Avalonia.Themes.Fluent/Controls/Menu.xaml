@@ -28,6 +28,7 @@
           <Panel>
             <ContentPresenter Name="PART_HeaderPresenter"
                               Content="{TemplateBinding Header}"
+                              ContentTemplate="{TemplateBinding HeaderTemplate}"
                               VerticalAlignment="Center"
                               HorizontalAlignment="Stretch"
                               RecognizesAccessKey="True"
@@ -37,6 +38,7 @@
                    MinWidth="{Binding Bounds.Width, RelativeSource={RelativeSource TemplatedParent}}"
                    IsLightDismissEnabled="True"
                    IsOpen="{TemplateBinding IsSubMenuOpen, Mode=TwoWay}"
+                   Placement="BottomEdgeAlignedLeft"
                    OverlayInputPassThroughElement="{Binding $parent[Menu]}">
               <Border Background="{DynamicResource MenuFlyoutPresenterBackground}"
                       BorderBrush="{DynamicResource MenuFlyoutPresenterBorderBrush}"
@@ -48,9 +50,7 @@
                       CornerRadius="{DynamicResource OverlayCornerRadius}">
                 <ScrollViewer Theme="{StaticResource FluentMenuScrollViewer}">
                   <ItemsPresenter Name="PART_ItemsPresenter"
-                                  Items="{TemplateBinding Items}"
                                   ItemsPanel="{TemplateBinding ItemsPanel}"
-                                  ItemTemplate="{TemplateBinding ItemTemplate}"
                                   Margin="{DynamicResource MenuFlyoutScrollerMargin}"
                                   Grid.IsSharedSizeScope="True" />
                 </ScrollViewer>
@@ -101,9 +101,7 @@
                 HorizontalAlignment="Stretch"
                 Padding="{TemplateBinding Padding}">
           <ItemsPresenter Name="PART_ItemsPresenter"
-                          Items="{TemplateBinding Items}"
                           ItemsPanel="{TemplateBinding ItemsPanel}"
-                          ItemTemplate="{TemplateBinding ItemTemplate}"
                           VerticalAlignment="Stretch"
                           KeyboardNavigation.TabNavigation="Continue" />
         </Border>

@@ -5,15 +5,20 @@ using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.UnitTests;
 using Avalonia.Media.Imaging;
+using Avalonia.Media.TextFormatting;
 
 namespace Avalonia.Base.UnitTests.VisualTree
 {
-    class MockRenderInterface : IPlatformRenderInterface
+    class MockRenderInterface : IPlatformRenderInterface, IPlatformRenderInterfaceContext
     {
         public IRenderTarget CreateRenderTarget(IEnumerable<object> surfaces)
         {
             throw new NotImplementedException();
         }
+
+        public bool IsLost => false;
+
+        public object TryGetFeature(Type featureType) => null;
 
         public IRenderTargetBitmapImpl CreateRenderTargetBitmap(PixelSize size, Vector dpi)
         {
@@ -25,12 +30,12 @@ namespace Avalonia.Base.UnitTests.VisualTree
             return new MockStreamGeometry();
         }
 
-        public IGeometryImpl CreateGeometryGroup(FillRule fillRule, IReadOnlyList<Geometry> children)
+        public IGeometryImpl CreateGeometryGroup(FillRule fillRule, IReadOnlyList<IGeometryImpl> children)
         {
             throw new NotImplementedException();
         }
 
-        public IGeometryImpl CreateCombinedGeometry(GeometryCombineMode combineMode, Geometry g1, Geometry g2)
+        public IGeometryImpl CreateCombinedGeometry(GeometryCombineMode combineMode, IGeometryImpl g1, IGeometryImpl g2)
         {
             throw new NotImplementedException();
         }
@@ -72,14 +77,21 @@ namespace Avalonia.Base.UnitTests.VisualTree
             throw new NotImplementedException();
         }
 
-        public IGlyphRunImpl CreateGlyphRun(IGlyphTypeface glyphTypeface, double fontRenderingEmSize, IReadOnlyList<ushort> glyphIndices, IReadOnlyList<double> glyphAdvances, IReadOnlyList<Vector> glyphOffsets)
+        public IGlyphRunImpl CreateGlyphRun(IGlyphTypeface glyphTypeface, double fontRenderingEmSize, 
+            IReadOnlyList<GlyphInfo> glyphInfos, Point baselineOrigin)
         {
             throw new NotImplementedException();
+        }
+
+        public IPlatformRenderInterfaceContext CreateBackendContext(IPlatformGraphicsContext graphicsContext)
+        {
+            return this;
         }
 
         public bool SupportsIndividualRoundRects { get; set; }
         public AlphaFormat DefaultAlphaFormat { get; }
         public PixelFormat DefaultPixelFormat { get; }
+        public bool IsSupportedBitmapPixelFormat(PixelFormat format) => true;
 
         public IFontManagerImpl CreateFontManager()
         {
@@ -262,6 +274,11 @@ namespace Avalonia.Base.UnitTests.VisualTree
                     return false;
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            
         }
     }
 

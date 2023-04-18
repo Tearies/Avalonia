@@ -13,9 +13,9 @@ namespace Avalonia.Base.UnitTests.Rendering.SceneGraph
         [Fact]
         public void Empty_Bounds_Remain_Empty()
         {
-            var target = new TestDrawOperation(Rect.Empty, Matrix.Identity, null);
+            var target = new TestDrawOperation(default, Matrix.Identity, null);
 
-            Assert.Equal(Rect.Empty, target.Bounds);
+            Assert.Equal(default, target.Bounds);
         }
 
         [Theory]
@@ -29,7 +29,7 @@ namespace Avalonia.Base.UnitTests.Rendering.SceneGraph
             double height,
             double scaleX,
             double scaleY,
-            double? penThickness,
+            double penThickness,
             double expectedX,
             double expectedY,
             double expectedWidth,
@@ -38,7 +38,7 @@ namespace Avalonia.Base.UnitTests.Rendering.SceneGraph
             var target = new TestRectangleDrawOperation(
                 new Rect(x, y, width, height),
                 Matrix.CreateScale(scaleX, scaleY),
-                penThickness.HasValue ? new Pen(Brushes.Black, penThickness.Value) : null);
+                new Pen(Brushes.Black, penThickness));
             Assert.Equal(new Rect(expectedX, expectedY, expectedWidth, expectedHeight), target.Bounds);
         }
 
@@ -69,20 +69,36 @@ namespace Avalonia.Base.UnitTests.Rendering.SceneGraph
                 new Matrix(),
                 Brushes.Black,
                 null,
-                geometry, default);
+                geometry);
 
             geometryNode.HitTest(new Point());
+        }
+
+        [Fact]
+        public void HitTest_RectangleNode_With_Transform_Hits()
+        {
+            var geometry = Mock.Of<IGeometryImpl>();
+            var geometryNode = new RectangleNode(
+                Matrix.CreateTranslation(20,20),
+                Brushes.Black,
+                null,
+                new RoundedRect(new Rect(0,0,10,10)),
+                default);
+
+            var actual = geometryNode.HitTest(new Point(25,25));
+
+            Assert.True(actual);
         }
 
         private class TestRectangleDrawOperation : RectangleNode
         {
             public TestRectangleDrawOperation(Rect bounds, Matrix transform, Pen pen) 
-                : base(transform, pen.Brush, pen, bounds, new BoxShadows())
+                : base(transform, pen.Brush?.ToImmutable(), pen, bounds, new BoxShadows())
             {
 
             }
 
-            public override bool HitTest(Point p) => false;
+            public override bool HitTestTransformed(Point p) => false;
 
             public override void Render(IDrawingContextImpl context) { }
         }

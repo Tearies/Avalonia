@@ -1,12 +1,10 @@
-#nullable enable
 using System;
-
 using Avalonia.Metadata;
 using Avalonia.Platform;
 
 namespace Avalonia.Markup.Xaml.MarkupExtensions;
 
-public class OnFormFactorExtension : OnFormFactorExtensionBase<object, On>
+public sealed class OnFormFactorExtension : OnFormFactorExtensionBase<object, On>
 {
     public OnFormFactorExtension()
     {
@@ -20,11 +18,11 @@ public class OnFormFactorExtension : OnFormFactorExtensionBase<object, On>
 
     public static bool ShouldProvideOption(IServiceProvider serviceProvider, FormFactorType option)
     {
-        return serviceProvider.GetService<IRuntimePlatform>().GetRuntimeInfo().FormFactor == option;
+        return serviceProvider.GetService<IRuntimePlatform>()?.GetRuntimeInfo().FormFactor == option;
     }
 }
 
-public class OnFormFactorExtension<TReturn> : OnFormFactorExtensionBase<TReturn, On<TReturn>>
+public sealed class OnFormFactorExtension<TReturn> : OnFormFactorExtensionBase<TReturn, On<TReturn>>
 {
     public OnFormFactorExtension()
     {
@@ -38,7 +36,7 @@ public class OnFormFactorExtension<TReturn> : OnFormFactorExtensionBase<TReturn,
 
     public static bool ShouldProvideOption(IServiceProvider serviceProvider, FormFactorType option)
     {
-        return serviceProvider.GetService<IRuntimePlatform>().GetRuntimeInfo().FormFactor == option;
+        return serviceProvider.GetService<IRuntimePlatform>()?.GetRuntimeInfo().FormFactor == option;
     }
 }
 

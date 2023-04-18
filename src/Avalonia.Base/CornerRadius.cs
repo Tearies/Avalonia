@@ -61,11 +61,6 @@ namespace Avalonia
         public double BottomLeft { get; }
 
         /// <summary>
-        /// Gets a value indicating whether all corner radii are set to 0.
-        /// </summary>
-        public bool IsEmpty => TopLeft.Equals(0) && IsUniform;
-
-        /// <summary>
         /// Gets a value indicating whether all corner radii are equal.
         /// </summary>
         public bool IsUniform => TopLeft.Equals(TopRight) && BottomLeft.Equals(BottomRight) && TopRight.Equals(BottomRight);
@@ -79,7 +74,6 @@ namespace Avalonia
         {
             // ReSharper disable CompareOfFloatsByEqualityOperator
             return TopLeft == other.TopLeft &&
-                   
                    TopRight == other.TopRight &&
                    BottomRight == other.BottomRight &&
                    BottomLeft == other.BottomLeft;
@@ -100,7 +94,7 @@ namespace Avalonia
 
         public override string ToString()
         {
-            return $"{TopLeft},{TopRight},{BottomRight},{BottomLeft}";
+            return FormattableString.Invariant($"{TopLeft},{TopRight},{BottomRight},{BottomLeft}");
         }
 
         public static CornerRadius Parse(string s)

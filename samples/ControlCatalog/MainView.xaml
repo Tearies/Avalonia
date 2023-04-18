@@ -14,8 +14,8 @@
         <Setter Property="HorizontalAlignment" Value="Left" />
       </Style>
     </Grid.Styles>
-      <controls:HamburgerMenu Name="Sidebar">
-        <TabItem Header="Composition">
+    <controls:HamburgerMenu Name="Sidebar">
+      <TabItem Header="Composition">
         <pages:CompositionPage/>
       </TabItem>
       <TabItem Header="Acrylic">
@@ -66,6 +66,9 @@
       <TabItem Header="Cursor" ScrollViewer.VerticalScrollBarVisibility="Disabled">
         <pages:CursorPage />
       </TabItem>
+      <TabItem Header="Custom Drawing" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+        <pages:CustomDrawing/>
+      </TabItem>
       <TabItem Header="DataGrid"
                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                ScrollViewer.VerticalScrollBarVisibility="Disabled">
@@ -88,6 +91,9 @@
       </TabItem>
       <TabItem Header="Flyouts">
         <pages:FlyoutsPage />
+      </TabItem>
+      <TabItem Header="Gestures">
+        <pages:GesturePage />
       </TabItem>
       <TabItem Header="Image"
                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -132,10 +138,13 @@
       <TabItem Header="RadioButton">
         <pages:RadioButtonPage />
       </TabItem>
+      <TabItem Header="RefreshContainer">
+        <pages:RefreshContainerPage />
+      </TabItem>
       <TabItem Header="RelativePanel">
         <pages:RelativePanelPage />
       </TabItem>
-        <TabItem Header="ScrollViewer">
+      <TabItem Header="ScrollViewer">
         <pages:ScrollViewerPage />
       </TabItem>
       <TabItem Header="Slider">
@@ -155,6 +164,9 @@
       </TabItem>
       <TabItem Header="TextBlock">
         <pages:TextBlockPage />
+      </TabItem>
+      <TabItem Header="Theme Variants">
+        <pages:ThemePage />
       </TabItem>
       <TabItem Header="ToggleSwitch">
         <pages:ToggleSwitchPage />
@@ -189,19 +201,26 @@
                 <SystemDecorations>Full</SystemDecorations>
               </ComboBox.Items>
             </ComboBox>
+            <ComboBox x:Name="ThemeVariants"
+                      HorizontalAlignment="Stretch"
+                      DisplayMemberBinding="{Binding Key, x:DataType=ThemeVariant}"
+                      SelectedIndex="0">
+              <ComboBox.Items>
+                <ThemeVariant>Default</ThemeVariant>
+                <ThemeVariant>Light</ThemeVariant>
+                <ThemeVariant>Dark</ThemeVariant>
+              </ComboBox.Items>
+            </ComboBox>
             <ComboBox x:Name="Themes"
                       HorizontalAlignment="Stretch"
                       SelectedIndex="0">
               <ComboBox.Items>
-                <models:CatalogTheme>FluentLight</models:CatalogTheme>
-                <models:CatalogTheme>FluentDark</models:CatalogTheme>
-                <models:CatalogTheme>SimpleLight</models:CatalogTheme>
-                <models:CatalogTheme>SimpleDark</models:CatalogTheme>
+                <models:CatalogTheme>Fluent</models:CatalogTheme>
+                <models:CatalogTheme>Simple</models:CatalogTheme>
               </ComboBox.Items>
             </ComboBox>
             <ComboBox x:Name="TransparencyLevels"
-                      HorizontalAlignment="Stretch"
-                      SelectedIndex="{Binding TransparencyLevel}">
+                      HorizontalAlignment="Stretch">
               <ComboBox.Items>
                 <WindowTransparencyLevel>None</WindowTransparencyLevel>
                 <WindowTransparencyLevel>Transparent</WindowTransparencyLevel>
@@ -219,7 +238,7 @@
               </ComboBox.Items>
             </ComboBox>
             <ComboBox HorizontalAlignment="Stretch"
-                      Items="{Binding WindowStates}"
+                      ItemsSource="{Binding WindowStates}"
                       SelectedItem="{Binding WindowState}" />
           </StackPanel>
         </Flyout>

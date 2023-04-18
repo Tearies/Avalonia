@@ -15,8 +15,8 @@ namespace Avalonia.Controls.Documents
         /// <summary>
         /// Defines the <see cref="Child"/> property.
         /// </summary>
-        public static readonly StyledProperty<IControl> ChildProperty =
-            AvaloniaProperty.Register<InlineUIContainer, IControl>(nameof(Child));
+        public static readonly StyledProperty<Control> ChildProperty =
+            AvaloniaProperty.Register<InlineUIContainer, Control>(nameof(Child));
 
         static InlineUIContainer()
         {
@@ -41,7 +41,7 @@ namespace Avalonia.Controls.Documents
         /// <param name="child">
         /// UIElement set as a child of this inline item
         /// </param>
-        public InlineUIContainer(IControl child)
+        public InlineUIContainer(Control child)
         {
             Child = child;
         }
@@ -50,7 +50,7 @@ namespace Avalonia.Controls.Documents
         /// The content spanned by this TextElement.
         /// </summary>
         [Content]
-        public IControl Child
+        public Control Child
         {
             get => GetValue(ChildProperty);
             set => SetValue(ChildProperty, value);
@@ -63,6 +63,24 @@ namespace Avalonia.Controls.Documents
 
         internal override void AppendText(StringBuilder stringBuilder)
         {
+        }
+
+        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+        {
+            base.OnPropertyChanged(change);
+
+            if (change.Property == ChildProperty)
+            {
+                if(change.OldValue is Control oldChild)
+                {
+                    LogicalChildren.Remove(oldChild);
+                }
+
+                if(change.NewValue is Control newChild)
+                {
+                    LogicalChildren.Add(newChild);
+                }
+            }
         }
     }
 }

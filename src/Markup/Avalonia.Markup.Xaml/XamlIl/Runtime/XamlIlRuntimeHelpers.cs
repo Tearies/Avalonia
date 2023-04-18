@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using Avalonia.Controls;
@@ -17,15 +18,15 @@ namespace Avalonia.Markup.Xaml.XamlIl.Runtime
         public static Func<IServiceProvider, object> DeferredTransformationFactoryV1(Func<IServiceProvider, object> builder,
             IServiceProvider provider)
         {
-            return DeferredTransformationFactoryV2<IControl>(builder, provider);
+            return DeferredTransformationFactoryV2<Control>(builder, provider);
         }
 
         public static Func<IServiceProvider, object> DeferredTransformationFactoryV2<T>(Func<IServiceProvider, object> builder,
             IServiceProvider provider)
         {
-            var resourceNodes = provider.GetService<IAvaloniaXamlIlParentStackProvider>().Parents
+            var resourceNodes = provider.GetRequiredService<IAvaloniaXamlIlParentStackProvider>().Parents
                 .OfType<IResourceNode>().ToList();
-            var rootObject = provider.GetService<IRootObjectProvider>().RootObject;
+            var rootObject = provider.GetRequiredService<IRootObjectProvider>().RootObject;
             var parentScope = provider.GetService<INameScope>();
             return sp =>
             {
@@ -33,24 +34,24 @@ namespace Avalonia.Markup.Xaml.XamlIl.Runtime
                 var obj = builder(new DeferredParentServiceProvider(sp, resourceNodes, rootObject, scope));
                 scope.Complete();
 
-                if(typeof(T) == typeof(IControl))
-                    return new ControlTemplateResult((IControl)obj, scope);
+                if(typeof(T) == typeof(Control))
+                    return new ControlTemplateResult((Control)obj, scope);
 
                 return new TemplateResult<T>((T)obj, scope);
             };
         }
 
-        class DeferredParentServiceProvider :
+        private class DeferredParentServiceProvider :
             IAvaloniaXamlIlParentStackProvider,
             IServiceProvider,
             IRootObjectProvider,
             IAvaloniaXamlIlControlTemplateProvider
         {
-            private readonly IServiceProvider _parentProvider;
-            private readonly List<IResourceNode> _parentResourceNodes;
+            private readonly IServiceProvider? _parentProvider;
+            private readonly List<IResourceNode>? _parentResourceNodes;
             private readonly INameScope _nameScope;
 
-            public DeferredParentServiceProvider(IServiceProvider parentProvider, List<IResourceNode> parentResourceNodes,
+            public DeferredParentServiceProvider(IServiceProvider? parentProvider, List<IResourceNode>? parentResourceNodes,
                 object rootObject, INameScope nameScope)
             {
                 _parentProvider = parentProvider;
@@ -69,7 +70,7 @@ namespace Avalonia.Markup.Xaml.XamlIl.Runtime
                     yield return p;
             }
 
-            public object GetService(Type serviceType)
+            public object? GetService(Type serviceType)
             {
                 if (serviceType == typeof(INameScope))
                     return _nameScope;
@@ -111,25 +112,25 @@ namespace Avalonia.Markup.Xaml.XamlIl.Runtime
         public static IServiceProvider CreateInnerServiceProviderV1(IServiceProvider compiled)
             => new InnerServiceProvider(compiled);
 
-        class InnerServiceProvider : IServiceProvider
+        private class InnerServiceProvider : IServiceProvider
         {
             private readonly IServiceProvider _compiledProvider;
-            private XamlTypeResolver _resolver;
+            private XamlTypeResolver? _resolver;
 
             public InnerServiceProvider(IServiceProvider compiledProvider)
             {
                 _compiledProvider = compiledProvider;
             }
-            public object GetService(Type serviceType)
+            public object? GetService(Type serviceType)
             {
                 if (serviceType == typeof(IXamlTypeResolver))
-                    return _resolver ?? (_resolver = new XamlTypeResolver(
-                               _compiledProvider.GetService<IAvaloniaXamlIlXmlNamespaceInfoProvider>()));
+                    return _resolver ??= new XamlTypeResolver(
+                        _compiledProvider.GetRequiredService<IAvaloniaXamlIlXmlNamespaceInfoProvider>());
                 return null;
             }
         }
 
-        class XamlTypeResolver : IXamlTypeResolver
+        private class XamlTypeResolver : IXamlTypeResolver
         {
             private readonly IAvaloniaXamlIlXmlNamespaceInfoProvider _nsInfo;
 
@@ -138,12 +139,12 @@ namespace Avalonia.Markup.Xaml.XamlIl.Runtime
                 _nsInfo = nsInfo;
             }
 
+            [RequiresUnreferencedCode(TrimmingMessages.XamlTypeResolvedRequiresUnreferenceCodeMessage)]
             public Type Resolve(string qualifiedTypeName)
             {
                 var sp = qualifiedTypeName.Split(new[] {':'}, 2);
                 var (ns, name) = sp.Length == 1 ? ("", qualifiedTypeName) : (sp[0], sp[1]);
                 var namespaces = _nsInfo.XmlNamespaces;
-                var dic = (Dictionary<string, IReadOnlyList<AvaloniaXamlIlXmlNamespaceInfo>>)namespaces;
                 if (!namespaces.TryGetValue(ns, out var lst))
                     throw new ArgumentException("Unable to resolve namespace for type " + qualifiedTypeName);
                 foreach (var entry in lst)
@@ -164,39 +165,51 @@ namespace Avalonia.Markup.Xaml.XamlIl.Runtime
         #line hidden
         public static IServiceProvider CreateRootServiceProviderV2()
         {
-            return new RootServiceProvider(new NameScope());
+            return new RootServiceProvider(new NameScope(), null);
+        }
+        public static IServiceProvider CreateRootServiceProviderV3(IServiceProvider parentServiceProvider)
+        {
+            return new RootServiceProvider(new NameScope(), parentServiceProvider);
         }
         #line default
 
-        class RootServiceProvider : IServiceProvider, IAvaloniaXamlIlParentStackProvider
+        private class RootServiceProvider : IServiceProvider
         {
             private readonly INameScope _nameScope;
-            private readonly IRuntimePlatform _runtimePlatform;
+            private readonly IServiceProvider? _parentServiceProvider;
+            private readonly IRuntimePlatform? _runtimePlatform;
 
-            public RootServiceProvider(INameScope nameScope)
+            public RootServiceProvider(INameScope nameScope, IServiceProvider? parentServiceProvider)
             {
                 _nameScope = nameScope;
+                _parentServiceProvider = parentServiceProvider;
                 _runtimePlatform = AvaloniaLocator.Current.GetService<IRuntimePlatform>();
             }
 
-            public object GetService(Type serviceType)
+            public object? GetService(Type serviceType)
             {
                 if (serviceType == typeof(INameScope))
                     return _nameScope;
                 if (serviceType == typeof(IAvaloniaXamlIlParentStackProvider))
-                    return this;
+                    return _parentServiceProvider?.GetService<IAvaloniaXamlIlParentStackProvider>()
+                           ?? DefaultAvaloniaXamlIlParentStackProvider.Instance;
                 if (serviceType == typeof(IRuntimePlatform))
                     return _runtimePlatform ?? throw new KeyNotFoundException($"{nameof(IRuntimePlatform)} was not registered");
 
                 return null;
             }
 
-            public IEnumerable<object> Parents
+            private class DefaultAvaloniaXamlIlParentStackProvider : IAvaloniaXamlIlParentStackProvider
             {
-                get
+                public static DefaultAvaloniaXamlIlParentStackProvider Instance { get; } = new(); 
+                
+                public IEnumerable<object> Parents
                 {
-                    if (Application.Current != null)
-                        yield return Application.Current;
+                    get
+                    {
+                        if (Application.Current != null)
+                            yield return Application.Current;
+                    }
                 }
             }
         }

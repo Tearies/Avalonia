@@ -18,12 +18,9 @@ namespace Avalonia.DesignerSupport
             Control control;
             using (PlatformManager.DesignerMode())
             {
-                var loader = AvaloniaLocator.Current.GetService<AvaloniaXamlLoader.IRuntimeXamlLoader>();
+                var loader = AvaloniaLocator.Current.GetRequiredService<AvaloniaXamlLoader.IRuntimeXamlLoader>();
                 var stream = new MemoryStream(Encoding.UTF8.GetBytes(xaml));
 
-                if (loader == null)
-                    throw new XamlLoadException("Runtime XAML loader is not registered");
-                
                 Uri baseUri = null;
                 if (assemblyPath != null)
                 {
@@ -38,10 +35,9 @@ namespace Avalonia.DesignerSupport
                 var useCompiledBindings = localAsm?.GetCustomAttributes<AssemblyMetadataAttribute>()
                     .FirstOrDefault(a => a.Key == "AvaloniaUseCompiledBindingsByDefault")?.Value;
 
-                var loaded = loader.Load(stream, new RuntimeXamlLoaderConfiguration
+                var loaded = loader.Load(new RuntimeXamlLoaderDocument(baseUri, stream), new RuntimeXamlLoaderConfiguration
                 {
                     LocalAssembly = localAsm,
-                    BaseUri = baseUri,
                     DesignMode = true,
                     UseCompiledBindingsByDefault = bool.TryParse(useCompiledBindings, out var parsedValue ) && parsedValue 
                 });

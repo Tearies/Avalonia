@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using Avalonia.Controls;
 using Avalonia.Data;
 
 namespace Avalonia.Markup.Xaml.UnitTests
@@ -13,6 +14,7 @@ namespace Avalonia.Markup.Xaml.UnitTests
         {
             // Ensure necessary assemblies are loaded.
             var _ = typeof(TemplateBinding);
+            GC.KeepAlive(typeof(ItemsRepeater));
             if (AvaloniaLocator.Current.GetService<AvaloniaXamlLoader.IRuntimeXamlLoader>() == null)
                 AvaloniaLocator.CurrentMutable.Bind<AvaloniaXamlLoader.IRuntimeXamlLoader>()
                     .ToConstant(new TestXamlLoaderShim());
@@ -20,8 +22,8 @@ namespace Avalonia.Markup.Xaml.UnitTests
         
         class TestXamlLoaderShim : AvaloniaXamlLoader.IRuntimeXamlLoader
         {
-            public object Load(Stream stream, RuntimeXamlLoaderConfiguration configuration) 
-                => AvaloniaRuntimeXamlLoader.Load(stream, configuration);
+            public object Load(RuntimeXamlLoaderDocument document, RuntimeXamlLoaderConfiguration configuration) 
+                => AvaloniaRuntimeXamlLoader.Load(document, configuration);
         }
     }
 }

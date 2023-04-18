@@ -13,9 +13,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Disposables;
 using System.Threading;
+using Avalonia.Controls.Platform.Surfaces;
 using Avalonia.Media;
 using Avalonia.Rendering.Composition;
 using Avalonia.Threading;
+using Avalonia.UnitTests;
+using Avalonia.Utilities;
 using SixLabors.ImageSharp.PixelFormats;
 using Image = SixLabors.ImageSharp.Image;
 #if AVALONIA_SKIA
@@ -30,7 +33,7 @@ namespace Avalonia.Skia.RenderTests
 namespace Avalonia.Direct2D1.RenderTests
 #endif
 {
-    public class TestBase
+    public class TestBase : IDisposable
     {
 #if AVALONIA_SKIA
         private static string s_fontUri = "resm:Avalonia.Skia.RenderTests.Assets?assembly=Avalonia.Skia.RenderTests#Noto Mono";
@@ -39,8 +42,8 @@ namespace Avalonia.Direct2D1.RenderTests
 #endif
         public static FontFamily TestFontFamily = new FontFamily(s_fontUri);
 
-        private static readonly TestThreadingInterface threadingInterface =
-            new TestThreadingInterface();
+        private static readonly TestDispatcherImpl threadingInterface =
+            new TestDispatcherImpl();
 
         private static readonly IAssetLoader assetLoader = new AssetLoader();
         
@@ -52,7 +55,7 @@ namespace Avalonia.Direct2D1.RenderTests
             Direct2D1Platform.Initialize();
 #endif
             AvaloniaLocator.CurrentMutable
-                .Bind<IPlatformThreadingInterface>()
+                .Bind<IDispatcherImpl>()
                 .ToConstant(threadingInterface);
 
             AvaloniaLocator.CurrentMutable
@@ -88,9 +91,8 @@ namespace Avalonia.Direct2D1.RenderTests
             }
 
             var immediatePath = Path.Combine(OutputPath, testName + ".immediate.out.png");
-            var deferredPath = Path.Combine(OutputPath, testName + ".deferred.out.png");
             var compositedPath = Path.Combine(OutputPath, testName + ".composited.out.png");
-            var factory = AvaloniaLocator.Current.GetService<IPlatformRenderInterface>();
+            var factory = AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
             var pixelSize = new PixelSize((int)target.Width, (int)target.Height);
             var size = new Size(target.Width, target.Height);
             var dpiVector = new Vector(dpi, dpi);
@@ -103,29 +105,16 @@ namespace Avalonia.Direct2D1.RenderTests
                 bitmap.Save(immediatePath);
             }
             
-            
-            using (var rtb = factory.CreateRenderTargetBitmap(pixelSize, dpiVector))
-            using (var renderer = new DeferredRenderer(target, rtb))
-            {
-                target.Measure(size);
-                target.Arrange(new Rect(size));
-                renderer.UnitTestUpdateScene();
-
-                // Do the deferred render on a background thread to expose any threading errors in
-                // the deferred rendering path.
-                await Task.Run((Action)renderer.UnitTestRender);
-                threadingInterface.MainThread = Thread.CurrentThread;
-
-                rtb.Save(deferredPath);
-            }
-
             var timer = new ManualRenderTimer();
 
             var compositor = new Compositor(new RenderLoop(timer, Dispatcher.UIThread), null);
-            using (var rtb = factory.CreateRenderTargetBitmap(pixelSize, dpiVector))
+            using (var writableBitmap = factory.CreateWriteableBitmap(pixelSize, dpiVector, factory.DefaultPixelFormat, factory.DefaultAlphaFormat))
             {
-                var root = new TestRenderRoot(dpiVector.X / 96, rtb);
-                using (var renderer = new CompositingRenderer(root, compositor) { RenderOnlyOnRenderThread = false})
+                var root = new TestRenderRoot(dpiVector.X / 96, null!);
+                using (var renderer = new CompositingRenderer(root, compositor, () => new[]
+                       {
+                           new BitmapFramebufferSurface(writableBitmap)
+                       }) { RenderOnlyOnRenderThread = false })
                 {
                     root.Initialize(renderer, target);
                     renderer.Start();
@@ -135,47 +124,53 @@ namespace Avalonia.Direct2D1.RenderTests
 
                 // Free pools
                 for (var c = 0; c < 11; c++)
-                    TestThreadingInterface.RunTimers();
-                rtb.Save(compositedPath);
+                    foreach (var dp in Dispatcher.SnapshotTimersForUnitTests())
+                        dp.ForceFire();
+                writableBitmap.Save(compositedPath);
             }
         }
 
-        protected void CompareImages([CallerMemberName] string testName = "")
+        class BitmapFramebufferSurface : IFramebufferPlatformSurface
+        {
+            private readonly IWriteableBitmapImpl _bitmap;
+
+            public BitmapFramebufferSurface(IWriteableBitmapImpl bitmap)
+            {
+                _bitmap = bitmap;
+            }
+            
+            public ILockedFramebuffer Lock() => _bitmap.Lock();
+        }
+
+        protected void CompareImages([CallerMemberName] string testName = "",
+            bool skipImmediate = false,  bool skipCompositor = false)
         {
             var expectedPath = Path.Combine(OutputPath, testName + ".expected.png");
             var immediatePath = Path.Combine(OutputPath, testName + ".immediate.out.png");
-            var deferredPath = Path.Combine(OutputPath, testName + ".deferred.out.png");
             var compositedPath = Path.Combine(OutputPath, testName + ".composited.out.png");
 
             using (var expected = Image.Load<Rgba32>(expectedPath))
             using (var immediate = Image.Load<Rgba32>(immediatePath))
-            using (var deferred = Image.Load<Rgba32>(deferredPath))
             using (var composited = Image.Load<Rgba32>(compositedPath))
             {
                 var immediateError = CompareImages(immediate, expected);
-                var deferredError = CompareImages(deferred, expected);
                 var compositedError = CompareImages(composited, expected);
 
-                if (immediateError > 0.022)
+                if (immediateError > 0.022 && !skipImmediate)
                 {
                     Assert.True(false, immediatePath + ": Error = " + immediateError);
                 }
 
-                if (deferredError > 0.022)
-                {
-                    Assert.True(false, deferredPath + ": Error = " + deferredError);
-                }
-                
-                if (compositedError > 0.022)
+                if (compositedError > 0.022 && !skipCompositor)
                 {
                     Assert.True(false, compositedPath + ": Error = " + compositedError);
                 }
             }
         }
 
-        protected void CompareImagesNoRenderer([CallerMemberName] string testName = "")
+        protected void CompareImagesNoRenderer([CallerMemberName] string testName = "", string expectedName = null)
         {
-            var expectedPath = Path.Combine(OutputPath, testName + ".expected.png");
+            var expectedPath = Path.Combine(OutputPath, (expectedName ?? testName) + ".expected.png");
             var actualPath = Path.Combine(OutputPath, testName + ".out.png");
 
             using (var expected = Image.Load<Rgba32>(expectedPath))
@@ -237,7 +232,7 @@ namespace Avalonia.Direct2D1.RenderTests
             return Math.Sqrt(meanSquaresError);
         }
 
-        private string GetTestsDirectory()
+        private static string GetTestsDirectory()
         {
             var path = Directory.GetCurrentDirectory();
 
@@ -249,45 +244,35 @@ namespace Avalonia.Direct2D1.RenderTests
             return path;
         }
 
-        private class TestThreadingInterface : IPlatformThreadingInterface
+        private class TestDispatcherImpl : IDispatcherImpl
         {
             public bool CurrentThreadIsLoopThread => MainThread.ManagedThreadId == Thread.CurrentThread.ManagedThreadId;
 
             public Thread MainThread { get; set; }
 
 #pragma warning disable 67
-            public event Action<DispatcherPriority?> Signaled;
+            public event Action Signaled;
+            public event Action Timer;
 #pragma warning restore 67
 
-            public void RunLoop(CancellationToken cancellationToken)
-            {
-                throw new NotImplementedException();
-            }
-
-            public void Signal(DispatcherPriority prio)
+            public void Signal()
             {
                 // No-op
             }
 
-            private static List<Action> s_timers = new();
-            
-            public static void RunTimers()
-            {
-                lock (s_timers)
-                {
-                    foreach(var t in s_timers.ToList())
-                        t.Invoke();
-                }
-            }
+            public long Now => 0;
 
-            public IDisposable StartTimer(DispatcherPriority priority, TimeSpan interval, Action tick)
+            public void UpdateTimer(long? dueTimeInMs)
             {
-                var act = () => tick();
-                lock (s_timers) s_timers.Add(act);
-                return Disposable.Create(() =>
-                {
-                    lock (s_timers) s_timers.Remove(act);
-                });
+                // No-op
+            }
+        }
+
+        public void Dispose()
+        {
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.RunJobs();
             }
         }
     }

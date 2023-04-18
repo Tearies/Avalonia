@@ -45,8 +45,6 @@ namespace Avalonia.Media
             }
         }
 
-        public bool IsEmpty => OffsetX == 0 && OffsetY == 0 && Blur == 0 && Spread == 0;
-
         private readonly static char[] s_Separator = new char[] { ' ', '\t' };
 
         struct ArrayReader
@@ -82,7 +80,7 @@ namespace Avalonia.Media
         {
             var sb = StringBuilderCache.Acquire();
 
-            if (IsEmpty)
+            if (this == default)
             {
                 return "none";
             }
@@ -94,22 +92,22 @@ namespace Avalonia.Media
 
             if (OffsetX != 0.0)
             {
-                sb.AppendFormat(" {0}", OffsetX.ToString());
+                sb.AppendFormat(" {0}", OffsetX.ToString(CultureInfo.InvariantCulture));
             }
 
             if (OffsetY != 0.0)
             {
-                sb.AppendFormat(" {0}", OffsetY.ToString());
+                sb.AppendFormat(" {0}", OffsetY.ToString(CultureInfo.InvariantCulture));
             }
             
             if (Blur != 0.0)
             {
-                sb.AppendFormat(" {0}", Blur.ToString());
+                sb.AppendFormat(" {0}", Blur.ToString(CultureInfo.InvariantCulture));
             }
 
             if (Spread != 0.0)
             {
-                sb.AppendFormat(" {0}", Spread.ToString());
+                sb.AppendFormat(" {0}", Spread.ToString(CultureInfo.InvariantCulture));
             }
 
             sb.AppendFormat(" {0}", Color.ToString());
@@ -171,5 +169,11 @@ namespace Avalonia.Media
 
         public Rect TransformBounds(in Rect rect)
             => IsInset ? rect : rect.Translate(new Vector(OffsetX, OffsetY)).Inflate(Spread + Blur);
+
+        public static bool operator ==(BoxShadow left, BoxShadow right) =>
+            left.Equals(right);
+
+        public static bool operator !=(BoxShadow left, BoxShadow right) => 
+            !(left == right);
     }
 }

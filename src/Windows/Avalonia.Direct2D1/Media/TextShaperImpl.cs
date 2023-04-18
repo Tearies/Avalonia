@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Buffers;
+using System.Collections.Concurrent;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Avalonia.Media.TextFormatting;
 using Avalonia.Media.TextFormatting.Unicode;
 using Avalonia.Platform;
-using Avalonia.Utilities;
 using HarfBuzzSharp;
 using Buffer = HarfBuzzSharp.Buffer;
 using GlyphInfo = HarfBuzzSharp.GlyphInfo;
@@ -12,8 +14,11 @@ namespace Avalonia.Direct2D1.Media
 {
     internal class TextShaperImpl : ITextShaperImpl
     {
-        public ShapedBuffer ShapeText(ReadOnlySlice<char> text, TextShaperOptions options)
+        private static readonly ConcurrentDictionary<int, Language> s_cachedLanguage = new();
+
+        public ShapedBuffer ShapeText(ReadOnlyMemory<char> text, TextShaperOptions options)
         {
+            var textSpan = text.Span;
             var typeface = options.Typeface;
             var fontRenderingEmSize = options.FontRenderingEmSize;
             var bidiLevel = options.BidiLevel;
@@ -21,7 +26,9 @@ namespace Avalonia.Direct2D1.Media
 
             using (var buffer = new Buffer())
             {
-                buffer.AddUtf16(text.Buffer.Span, text.BufferOffset, text.Length);
+                // HarfBuzz needs the surrounding characters to correctly shape the text
+                var containingText = GetContainingMemory(text, out var start, out var length).Span;
+                buffer.AddUtf16(containingText, start, length);
 
                 MergeBreakPair(buffer);
 
@@ -29,13 +36,15 @@ namespace Avalonia.Direct2D1.Media
 
                 buffer.Direction = (bidiLevel & 1) == 0 ? Direction.LeftToRight : Direction.RightToLeft;
 
-                buffer.Language = new Language(culture ?? CultureInfo.CurrentCulture);
+                var usedCulture = culture ?? CultureInfo.CurrentCulture;
+
+                buffer.Language = s_cachedLanguage.GetOrAdd(usedCulture.LCID, _ => new Language(usedCulture));
 
                 var font = ((GlyphTypefaceImpl)typeface).Font;
 
                 font.Shape(buffer);
 
-                if(buffer.Direction == Direction.RightToLeft)
+                if (buffer.Direction == Direction.RightToLeft)
                 {
                     buffer.Reverse();
                 }
@@ -60,11 +69,11 @@ namespace Avalonia.Direct2D1.Media
 
                     var glyphCluster = (int)(sourceInfo.Cluster);
 
-                    var glyphAdvance = GetGlyphAdvance(glyphPositions, i, textScale);
+                    var glyphAdvance = GetGlyphAdvance(glyphPositions, i, textScale) + options.LetterSpacing;
 
                     var glyphOffset = GetGlyphOffset(glyphPositions, i, textScale);
 
-                    if (text.Buffer.Span[glyphCluster] == '\t')
+                    if (glyphCluster < containingText.Length && containingText[glyphCluster] == '\t')
                     {
                         glyphIndex = typeface.GetGlyph(' ');
 
@@ -73,9 +82,7 @@ namespace Avalonia.Direct2D1.Media
                             4 * typeface.GetGlyphAdvance(glyphIndex) * textScale;
                     }
 
-                    var targetInfo = new Avalonia.Media.TextFormatting.GlyphInfo(glyphIndex, glyphCluster, glyphAdvance, glyphOffset);
-
-                    shapedBuffer[i] = targetInfo;
+                    shapedBuffer[i] = new Avalonia.Media.TextFormatting.GlyphInfo(glyphIndex, glyphCluster, glyphAdvance, glyphOffset);
                 }
 
                 return shapedBuffer;
@@ -146,6 +153,29 @@ namespace Avalonia.Direct2D1.Media
             // Depends on direction of layout
             // glyphPositions[index].YAdvance * textScale;
             return glyphPositions[index].XAdvance * textScale;
+        }
+
+        private static ReadOnlyMemory<char> GetContainingMemory(ReadOnlyMemory<char> memory, out int start, out int length)
+        {
+            if (MemoryMarshal.TryGetString(memory, out var containingString, out start, out length))
+            {
+                return containingString.AsMemory();
+            }
+
+            if (MemoryMarshal.TryGetArray(memory, out var segment))
+            {
+                start = segment.Offset;
+                length = segment.Count;
+                return segment.Array.AsMemory();
+            }
+
+            if (MemoryMarshal.TryGetMemoryManager(memory, out MemoryManager<char> memoryManager, out start, out length))
+            {
+                return memoryManager.Memory;
+            }
+
+            // should never happen
+            throw new InvalidOperationException("Memory not backed by string, array or manager");
         }
     }
 }

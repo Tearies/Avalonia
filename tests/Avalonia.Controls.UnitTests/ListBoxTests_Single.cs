@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using Avalonia.Controls.Presenters;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Input;
@@ -25,14 +26,13 @@ namespace Avalonia.Controls.UnitTests
             var target = new ListBox
             {
                 Template = new FuncControlTemplate(CreateListBoxTemplate),
-                Items = new[] { "Foo", "Bar", "Baz " },
+                ItemsSource = new[] { "Foo", "Bar", "Baz " },
             };
 
             ApplyTemplate(target);
 
             target.Presenter.Panel.Children[0].RaiseEvent(new GotFocusEventArgs
             {
-                RoutedEvent = InputElement.GotFocusEvent,
                 NavigationMethod = NavigationMethod.Tab,
             });
 
@@ -45,14 +45,13 @@ namespace Avalonia.Controls.UnitTests
             var target = new ListBox
             {
                 Template = new FuncControlTemplate(CreateListBoxTemplate),
-                Items = new[] { "Foo", "Bar", "Baz " },
+                ItemsSource = new[] { "Foo", "Bar", "Baz " },
             };
 
             ApplyTemplate(target);
 
             target.Presenter.Panel.Children[0].RaiseEvent(new GotFocusEventArgs
             {
-                RoutedEvent = InputElement.GotFocusEvent,
                 NavigationMethod = NavigationMethod.Directional,
             });
 
@@ -65,14 +64,13 @@ namespace Avalonia.Controls.UnitTests
             var target = new ListBox
             {
                 Template = new FuncControlTemplate(CreateListBoxTemplate),
-                Items = new[] { "Foo", "Bar", "Baz " },
+                ItemsSource = new[] { "Foo", "Bar", "Baz " },
             };
 
             ApplyTemplate(target);
 
             target.Presenter.Panel.Children[0].RaiseEvent(new GotFocusEventArgs
             {
-                RoutedEvent = InputElement.GotFocusEvent,
                 NavigationMethod = NavigationMethod.Directional,
                 KeyModifiers = KeyModifiers.Control
             });
@@ -88,14 +86,13 @@ namespace Avalonia.Controls.UnitTests
                 var target = new ListBox
                 {
                     Template = new FuncControlTemplate(CreateListBoxTemplate),
-                    Items = new[] { "Foo", "Bar", "Baz " },
+                    ItemsSource = new[] { "Foo", "Bar", "Baz " },
                 };
                 AvaloniaLocator.CurrentMutable.Bind<PlatformHotkeyConfiguration>().ToConstant(new Mock<PlatformHotkeyConfiguration>().Object);
                 ApplyTemplate(target);
 
                 target.Presenter.Panel.Children[0].RaiseEvent(new GotFocusEventArgs
                 {
-                    RoutedEvent = InputElement.GotFocusEvent,
                     NavigationMethod = NavigationMethod.Directional,
                     KeyModifiers = KeyModifiers.Control
                 });
@@ -119,7 +116,7 @@ namespace Avalonia.Controls.UnitTests
                 var target = new ListBox
                 {
                     Template = new FuncControlTemplate(CreateListBoxTemplate),
-                    Items = new[] { "Foo", "Bar", "Baz " },
+                    ItemsSource = new[] { "Foo", "Bar", "Baz " },
                 };
                 AvaloniaLocator.CurrentMutable.Bind<PlatformHotkeyConfiguration>().ToConstant(new Mock<PlatformHotkeyConfiguration>().Object);
                 ApplyTemplate(target);
@@ -137,7 +134,7 @@ namespace Avalonia.Controls.UnitTests
                 var target = new ListBox
                 {
                     Template = new FuncControlTemplate(CreateListBoxTemplate),
-                    Items = new[] { "Foo", "Bar", "Baz " },
+                    ItemsSource = new[] { "Foo", "Bar", "Baz " },
                 };
                 AvaloniaLocator.CurrentMutable.Bind<PlatformHotkeyConfiguration>().ToConstant(new Mock<PlatformHotkeyConfiguration>().Object);
                 ApplyTemplate(target);
@@ -157,7 +154,7 @@ namespace Avalonia.Controls.UnitTests
                 var target = new ListBox
                 {
                     Template = new FuncControlTemplate(CreateListBoxTemplate),
-                    Items = new[] { "Foo", "Bar", "Baz " },
+                    ItemsSource = new[] { "Foo", "Bar", "Baz " },
                     SelectionMode = SelectionMode.Single | SelectionMode.Toggle,
                 };
                 AvaloniaLocator.CurrentMutable.Bind<PlatformHotkeyConfiguration>().ToConstant(new Mock<PlatformHotkeyConfiguration>().Object);
@@ -177,7 +174,7 @@ namespace Avalonia.Controls.UnitTests
                 var target = new ListBox
                 {
                     Template = new FuncControlTemplate(CreateListBoxTemplate),
-                    Items = new[] { "Foo", "Bar", "Baz " },
+                    ItemsSource = new[] { "Foo", "Bar", "Baz " },
                     SelectionMode = SelectionMode.Toggle,
                 };
 
@@ -199,7 +196,7 @@ namespace Avalonia.Controls.UnitTests
                 var target = new ListBox
                 {
                     Template = new FuncControlTemplate(CreateListBoxTemplate),
-                    Items = new[] { "Foo", "Bar", "Baz " },
+                    ItemsSource = new[] { "Foo", "Bar", "Baz " },
                     SelectionMode = SelectionMode.Toggle | SelectionMode.AlwaysSelected,
                 };
                 AvaloniaLocator.CurrentMutable.Bind<PlatformHotkeyConfiguration>().ToConstant(new Mock<PlatformHotkeyConfiguration>().Object);
@@ -220,7 +217,7 @@ namespace Avalonia.Controls.UnitTests
                 var target = new ListBox
                 {
                     Template = new FuncControlTemplate(CreateListBoxTemplate),
-                    Items = new[] { "Foo", "Bar", "Baz " },
+                    ItemsSource = new[] { "Foo", "Bar", "Baz " },
                     SelectionMode = SelectionMode.Single | SelectionMode.Toggle,
                 };
                 AvaloniaLocator.CurrentMutable.Bind<PlatformHotkeyConfiguration>().ToConstant(new Mock<PlatformHotkeyConfiguration>().Object);
@@ -239,7 +236,7 @@ namespace Avalonia.Controls.UnitTests
             var target = new ListBox
             {
                 Template = new FuncControlTemplate(CreateListBoxTemplate),
-                Items = new[] { "Foo", "Bar", "Baz " },
+                ItemsSource = new[] { "Foo", "Bar", "Baz " },
             };
 
             ApplyTemplate(target);
@@ -262,7 +259,7 @@ namespace Avalonia.Controls.UnitTests
             {
                 Template = new FuncControlTemplate(CreateListBoxTemplate),
                 DataContext = viewModel,
-                Items = viewModel.Items
+                ItemsSource = viewModel.Items
             };
 
             target.Bind(ListBox.SelectedItemProperty,
@@ -315,7 +312,7 @@ namespace Avalonia.Controls.UnitTests
             }
         }
 
-        private Control CreateListBoxTemplate(ITemplatedControl parent, INameScope scope)
+        private Control CreateListBoxTemplate(TemplatedControl parent, INameScope scope)
         {
             return new ScrollViewer
             {
@@ -323,12 +320,11 @@ namespace Avalonia.Controls.UnitTests
                 Content = new ItemsPresenter
                 {
                     Name = "PART_ItemsPresenter",
-                    [~ItemsPresenter.ItemsProperty] = parent.GetObservable(ItemsControl.ItemsProperty).ToBinding(),
                 }.RegisterInNameScope(scope)
             };
         }
 
-        private Control CreateScrollViewerTemplate(ITemplatedControl parent, INameScope scope)
+        private Control CreateScrollViewerTemplate(TemplatedControl parent, INameScope scope)
         {
             return new ScrollContentPresenter
             {
@@ -338,7 +334,7 @@ namespace Avalonia.Controls.UnitTests
             }.RegisterInNameScope(scope);
         }
 
-        private void ApplyTemplate(ListBox target)
+        private static void ApplyTemplate(ListBox target)
         {
             // Apply the template to the ListBox itself.
             target.ApplyTemplate();

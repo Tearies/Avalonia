@@ -221,15 +221,6 @@ namespace Avalonia.Markup.Xaml.XamlIl.CompilerExtensions
                 return ConvertDefinitionList(node, text, types, types.RowDefinitions, types.RowDefinition, "row definitions", out result);
             }
 
-            if (type.Equals(types.Classes))
-            {
-                var classes = text.Split(' ');
-                var classNodes = classes.Select(c => new XamlAstTextNode(node, c, type: types.XamlIlTypes.String)).ToArray();
-
-                result = new AvaloniaXamlIlAvaloniaListConstantAstNode(node, types, types.Classes, types.XamlIlTypes.String, classNodes);
-                return true;
-            }
-
             if (types.IBrush.IsAssignableFrom(type))
             {
                 if (Color.TryParse(text, out Color color))
@@ -274,7 +265,7 @@ namespace Avalonia.Markup.Xaml.XamlIl.CompilerExtensions
             {
                 var uriText = text.Trim();
 
-                var kind = ((!uriText?.StartsWith("/") == true) ? UriKind.Absolute : UriKind.Relative);
+                var kind = ((!uriText?.StartsWith("/") == true) ? UriKind.RelativeOrAbsolute : UriKind.Relative);
 
                 if (string.IsNullOrWhiteSpace(uriText) || !Uri.TryCreate(uriText, kind, out var _))
                 {
@@ -289,6 +280,19 @@ namespace Avalonia.Markup.Xaml.XamlIl.CompilerExtensions
                         new XamlConstantNode(node, types.UriKind, (int)kind),
                     });
                 return true;
+            }
+
+            if (type.Equals(types.ThemeVariant))
+            {
+                var variantText = text.Trim();
+                var foundConstProperty = types.ThemeVariant.Properties.FirstOrDefault(p =>
+                    p.Name == variantText && p.PropertyType == types.ThemeVariant);
+                var themeVariantTypeRef = new XamlAstClrTypeReference(node, types.ThemeVariant, false);
+                if (foundConstProperty is not null)
+                {
+                    result = new XamlStaticExtensionNode(new XamlAstObjectNode(node, node.Type), themeVariantTypeRef, foundConstProperty.Name);
+                    return true;
+                }
             }
 
             result = null;

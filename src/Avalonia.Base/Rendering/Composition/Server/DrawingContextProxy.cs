@@ -18,22 +18,14 @@ namespace Avalonia.Rendering.Composition.Server;
 /// they have information about the full render transform (they are not)
 /// 2) Keeps the draw list for the VisualBrush contents of the current drawing operation.
 /// </summary>
-internal class CompositorDrawingContextProxy : IDrawingContextImpl, IDrawingContextWithAcrylicLikeSupport
+internal class CompositorDrawingContextProxy : IDrawingContextImpl,
+    IDrawingContextWithAcrylicLikeSupport, IDrawingContextImplWithEffects
 {
     private IDrawingContextImpl _impl;
-    private readonly VisualBrushRenderer _visualBrushRenderer;
 
-    public CompositorDrawingContextProxy(IDrawingContextImpl impl, VisualBrushRenderer visualBrushRenderer)
+    public CompositorDrawingContextProxy(IDrawingContextImpl impl)
     {
         _impl = impl;
-        _visualBrushRenderer = visualBrushRenderer;
-    }
-
-    // This is a hack to make it work with the current way of handling visual brushes
-    public CompositionDrawList? VisualBrushDrawList
-    {
-        get => _visualBrushRenderer.VisualBrushDrawList;
-        set => _visualBrushRenderer.VisualBrushDrawList = value;
     }
     
     public Matrix PostTransform { get; set; } = Matrix.Identity;
@@ -66,7 +58,7 @@ internal class CompositorDrawingContextProxy : IDrawingContextImpl, IDrawingCont
         _impl.DrawBitmap(source, opacityMask, opacityMaskRect, destRect);
     }
 
-    public void DrawLine(IPen pen, Point p1, Point p2)
+    public void DrawLine(IPen? pen, Point p1, Point p2)
     {
         _impl.DrawLine(pen, p1, p2);
     }
@@ -86,7 +78,7 @@ internal class CompositorDrawingContextProxy : IDrawingContextImpl, IDrawingCont
         _impl.DrawEllipse(brush, pen, rect);
     }
 
-    public void DrawGlyphRun(IBrush foreground, GlyphRun glyphRun)
+    public void DrawGlyphRun(IBrush? foreground, IRef<IGlyphRunImpl> glyphRun)
     {
         _impl.DrawGlyphRun(foreground, glyphRun);
     }
@@ -111,9 +103,9 @@ internal class CompositorDrawingContextProxy : IDrawingContextImpl, IDrawingCont
         _impl.PopClip();
     }
 
-    public void PushOpacity(double opacity)
+    public void PushOpacity(double opacity, Rect bounds)
     {
-        _impl.PushOpacity(opacity);
+        _impl.PushOpacity(opacity, bounds);
     }
 
     public void PopOpacity()
@@ -157,28 +149,23 @@ internal class CompositorDrawingContextProxy : IDrawingContextImpl, IDrawingCont
     }
 
     public object? GetFeature(Type t) => _impl.GetFeature(t);
-
-    public class VisualBrushRenderer : IVisualBrushRenderer
-    {
-        public CompositionDrawList? VisualBrushDrawList { get; set; }
-        public Size GetRenderTargetSize(IVisualBrush brush)
-        {
-            return VisualBrushDrawList?.Size ?? Size.Empty;
-        }
-
-        public void RenderVisualBrush(IDrawingContextImpl context, IVisualBrush brush)
-        {
-            if (VisualBrushDrawList != null)
-            {
-                foreach (var cmd in VisualBrushDrawList)
-                    cmd.Item.Render(context);
-            }
-        }
-    }
+    
 
     public void DrawRectangle(IExperimentalAcrylicMaterial material, RoundedRect rect)
     {
         if (_impl is IDrawingContextWithAcrylicLikeSupport acrylic) 
             acrylic.DrawRectangle(material, rect);
+    }
+
+    public void PushEffect(IEffect effect)
+    {
+        if (_impl is IDrawingContextImplWithEffects effects)
+            effects.PushEffect(effect);
+    }
+
+    public void PopEffect()
+    {
+        if (_impl is IDrawingContextImplWithEffects effects)
+            effects.PopEffect();
     }
 }

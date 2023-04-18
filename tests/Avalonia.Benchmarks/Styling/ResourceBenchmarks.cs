@@ -22,9 +22,8 @@ namespace Avalonia.Benchmarks.Styling
                 platform: new AppBuilder().RuntimePlatform,
                 renderInterface: new MockPlatformRenderInterface(),
                 standardCursorFactory: Mock.Of<ICursorFactory>(),
-                styler: new Styler(),
                 theme: () => CreateTheme(),
-                threadingInterface: new NullThreadingPlatform(),
+                dispatcherImpl: new NullThreadingPlatform(),
                 fontManagerImpl: new MockFontManagerImpl(),
                 textShaperImpl: new MockTextShaperImpl(),
                 windowingPlatform: new MockWindowingPlatform());
@@ -45,7 +44,7 @@ namespace Avalonia.Benchmarks.Styling
             return new Styles
             {
                 preHost,
-                new TestStyles(50, 3, 5),
+                new TestStyles(50, 3, 5, 0),
                 postHost
             };
         }

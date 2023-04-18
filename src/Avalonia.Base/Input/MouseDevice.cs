@@ -1,12 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reactive.Linq;
+using Avalonia.Reactive;
 using Avalonia.Input.Raw;
-using Avalonia.Interactivity;
 using Avalonia.Platform;
 using Avalonia.Utilities;
-using Avalonia.VisualTree;
+#pragma warning disable CS0618
 
 namespace Avalonia.Input
 {
@@ -34,7 +32,7 @@ namespace Avalonia.Input
                 ProcessRawEvent(margs);
         }
 
-        int ButtonCount(PointerPointProperties props)
+        static int ButtonCount(PointerPointProperties props)
         {
             var rv = 0;
             if (props.IsLeftButtonPressed)
@@ -106,9 +104,10 @@ namespace Avalonia.Input
 
         private void LeaveWindow()
         {
+
         }
 
-        PointerPointProperties CreateProperties(RawPointerEventArgs args)
+        static PointerPointProperties CreateProperties(RawPointerEventArgs args)
         {
             return new PointerPointProperties(args.InputModifiers, args.Type.ToUpdateKind());
         }
@@ -141,7 +140,7 @@ namespace Avalonia.Input
                     _lastClickRect = new Rect(p, new Size())
                         .Inflate(new Thickness(doubleClickSize.Width / 2, doubleClickSize.Height / 2));
                     _lastMouseDownButton = properties.PointerUpdateKind.GetMouseButton();
-                    var e = new PointerPressedEventArgs(source, _pointer, root, p, timestamp, properties, inputModifiers, _clickCount);
+                    var e = new PointerPressedEventArgs(source, _pointer, (Visual)root, p, timestamp, properties, inputModifiers, _clickCount);
                     source.RaiseEvent(e);
                     return e.Handled;
                 }
@@ -161,7 +160,7 @@ namespace Avalonia.Input
 
             if (source is object)
             {
-                var e = new PointerEventArgs(InputElement.PointerMovedEvent, source, _pointer, root,
+                var e = new PointerEventArgs(InputElement.PointerMovedEvent, source, _pointer, (Visual)root,
                     p, timestamp, properties, inputModifiers, intermediatePoints);
 
                 source.RaiseEvent(e);
@@ -181,11 +180,12 @@ namespace Avalonia.Input
 
             if (source is not null)
             {
-                var e = new PointerReleasedEventArgs(source, _pointer, root, p, timestamp, props, inputModifiers,
+                var e = new PointerReleasedEventArgs(source, _pointer, (Visual)root, p, timestamp, props, inputModifiers,
                     _lastMouseDownButton);
 
                 source?.RaiseEvent(e);
                 _pointer.Capture(null);
+                _lastMouseDownButton = default;
                 return e.Handled;
             }
 
@@ -204,7 +204,7 @@ namespace Avalonia.Input
 
             if (source is not null)
             {
-                var e = new PointerWheelEventArgs(source, _pointer, root, p, timestamp, props, inputModifiers, delta);
+                var e = new PointerWheelEventArgs(source, _pointer, (Visual)root, p, timestamp, props, inputModifiers, delta);
 
                 source?.RaiseEvent(e);
                 return e.Handled;
@@ -224,7 +224,7 @@ namespace Avalonia.Input
             if (source != null)
             {
                 var e = new PointerDeltaEventArgs(Gestures.PointerTouchPadGestureMagnifyEvent, source,
-                    _pointer, root, p, timestamp, props, inputModifiers, delta);
+                    _pointer, (Visual)root, p, timestamp, props, inputModifiers, delta);
 
                 source?.RaiseEvent(e);
                 return e.Handled;
@@ -244,7 +244,7 @@ namespace Avalonia.Input
             if (source != null)
             {
                 var e = new PointerDeltaEventArgs(Gestures.PointerTouchPadGestureRotateEvent, source,
-                    _pointer, root, p, timestamp, props, inputModifiers, delta);
+                    _pointer, (Visual)root, p, timestamp, props, inputModifiers, delta);
 
                 source?.RaiseEvent(e);
                 return e.Handled;
@@ -264,7 +264,7 @@ namespace Avalonia.Input
             if (source != null)
             {
                 var e = new PointerDeltaEventArgs(Gestures.PointerTouchPadGestureSwipeEvent, source, 
-                    _pointer, root, p, timestamp, props, inputModifiers, delta);
+                    _pointer, (Visual)root, p, timestamp, props, inputModifiers, delta);
 
                 source?.RaiseEvent(e);
                 return e.Handled;

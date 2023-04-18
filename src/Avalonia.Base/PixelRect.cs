@@ -10,11 +10,6 @@ namespace Avalonia
     public readonly struct PixelRect : IEquatable<PixelRect>
     {
         /// <summary>
-        /// An empty rectangle.
-        /// </summary>
-        public static readonly PixelRect Empty = default;
-
-        /// <summary>
         /// Initializes a new instance of the <see cref="PixelRect"/> structure.
         /// </summary>
         /// <param name="x">The X position.</param>
@@ -131,11 +126,6 @@ namespace Avalonia
         /// Gets the center point of the rectangle.
         /// </summary>
         public PixelPoint Center => new PixelPoint(X + (Width / 2), Y + (Height / 2));
-
-        /// <summary>
-        /// Gets a value that indicates whether the rectangle is empty.
-        /// </summary>
-        public bool IsEmpty => Width == 0 && Height == 0;
 
         /// <summary>
         /// Checks for equality between two <see cref="PixelRect"/>s.
@@ -257,7 +247,7 @@ namespace Avalonia
             }
             else
             {
-                return Empty;
+                return default;
             }
         }
 
@@ -290,11 +280,11 @@ namespace Avalonia
         /// <returns>The union.</returns>
         public PixelRect Union(PixelRect rect)
         {
-            if (IsEmpty)
+            if (Width == 0 && Height == 0)
             {
                 return rect;
             }
-            else if (rect.IsEmpty)
+            else if (rect.Width == 0 && rect.Height == 0)
             {
                 return this;
             }
@@ -346,7 +336,7 @@ namespace Avalonia
         /// <returns>The new <see cref="PixelRect"/>.</returns>
         public PixelRect WithHeight(int height)
         {
-            return new PixelRect(X, Y, Width, Height);
+            return new PixelRect(X, Y, Width, height);
         }
 
         /// <summary>

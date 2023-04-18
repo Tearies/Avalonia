@@ -18,7 +18,7 @@ namespace Avalonia.Controls
         /// <summary>
         /// Raised when the <see cref="IsChecked"/> property value changes.
         /// </summary>
-        public event EventHandler<RoutedEventArgs> IsCheckedChanged
+        public event EventHandler<RoutedEventArgs>? IsCheckedChanged
         {
             add => AddHandler(IsCheckedChangedEvent, value);
             remove => RemoveHandler(IsCheckedChangedEvent, value);
@@ -39,20 +39,12 @@ namespace Avalonia.Controls
             AvaloniaProperty.Register<ToggleSplitButton, bool>(
                 nameof(IsChecked));
 
-        ////////////////////////////////////////////////////////////////////////
-        // Constructor / Destructors
-        ////////////////////////////////////////////////////////////////////////
-
         /// <summary>
         /// Initializes a new instance of the <see cref="ToggleSplitButton"/> class.
         /// </summary>
         public ToggleSplitButton()
         {
         }
-
-        ////////////////////////////////////////////////////////////////////////
-        // Properties
-        ////////////////////////////////////////////////////////////////////////
 
         /// <summary>
         /// Gets or sets a value indicating whether the <see cref="ToggleSplitButton"/> is checked.
@@ -73,21 +65,13 @@ namespace Avalonia.Controls
         /// </remarks>
         Type IStyleable.StyleKey => typeof(SplitButton);
 
-        ////////////////////////////////////////////////////////////////////////
-        // Methods
-        ////////////////////////////////////////////////////////////////////////
-
         /// <summary>
         /// Toggles the <see cref="IsChecked"/> property between true and false.
         /// </summary>
         protected void Toggle()
         {
-            IsChecked = !IsChecked;
+            SetCurrentValue(IsCheckedProperty, !IsChecked);
         }
-
-        ////////////////////////////////////////////////////////////////////////
-        // OnEvent Overridable Methods
-        ////////////////////////////////////////////////////////////////////////
 
         /// <inheritdoc/>
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs e)

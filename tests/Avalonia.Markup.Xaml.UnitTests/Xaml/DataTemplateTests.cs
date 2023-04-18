@@ -74,7 +74,7 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
 <Window xmlns='https://github.com/avaloniaui'
         xmlns:sys='clr-namespace:System;assembly=mscorlib'
         xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
-    <ItemsControl Name='itemsControl' Items='{Binding}'>
+    <ItemsControl Name='itemsControl' ItemsSource='{Binding}'>
         <ItemsControl.ItemTemplate>
             <DataTemplate>
                 <UserControl Name='foo'/>
@@ -221,7 +221,7 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
 
                 var canvas = (Canvas)target.Presenter.Child;
                 Assert.Same(viewModel, target.DataContext);
-                Assert.Same(viewModel.Child, target.Presenter.DataContext);
+                Assert.Same(viewModel.Child, ((Control)target.Presenter).DataContext);
                 Assert.Same(viewModel.Child.Child, canvas.DataContext);
             }
         }

@@ -10,6 +10,7 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Utilities;
 using Avalonia.Automation;
+using Avalonia.Controls.Automation.Peers;
 
 namespace Avalonia.Controls
 {
@@ -79,16 +80,16 @@ namespace Avalonia.Controls
             AvaloniaProperty.Register<Slider, TickPlacement>(nameof(TickPlacement), 0d);
 
         /// <summary>
-        /// Defines the <see cref="TicksProperty"/> property.
+        /// Defines the <see cref="Ticks"/> property.
         /// </summary>
-        public static readonly StyledProperty<AvaloniaList<double>> TicksProperty =
+        public static readonly StyledProperty<AvaloniaList<double>?> TicksProperty =
             TickBar.TicksProperty.AddOwner<Slider>();
 
         // Slider required parts
-        private bool _isDragging = false;
-        private Track? _track;
-        private Button? _decreaseButton;
-        private Button? _increaseButton;
+        protected bool _isDragging;
+        protected Track? _track;
+        protected Button? _decreaseButton;
+        protected Button? _increaseButton;
         private IDisposable? _decreaseButtonPressDispose;
         private IDisposable? _decreaseButtonReleaseDispose;
         private IDisposable? _increaseButtonSubscription;
@@ -109,7 +110,7 @@ namespace Avalonia.Controls
             Thumb.DragCompletedEvent.AddClassHandler<Slider>((x, e) => x.OnThumbDragCompleted(e),
                 RoutingStrategies.Bubble);
 
-            ValueProperty.OverrideMetadata<Slider>(new DirectPropertyMetadata<double>(enableDataValidation: true));
+            ValueProperty.OverrideMetadata<Slider>(new(enableDataValidation: true));
             AutomationProperties.ControlTypeOverrideProperty.OverrideDefaultValue<Slider>(AutomationControlType.Slider);
         }
 
@@ -124,7 +125,7 @@ namespace Avalonia.Controls
         /// <summary>
         /// Defines the ticks to be drawn on the tick bar.
         /// </summary>
-        public AvaloniaList<double> Ticks
+        public AvaloniaList<double>? Ticks
         {
             get => GetValue(TicksProperty);
             set => SetValue(TicksProperty, value);
@@ -190,7 +191,7 @@ namespace Avalonia.Controls
             _increaseButtonSubscription?.Dispose();
             _increaseButtonReleaseDispose?.Dispose();
             _pointerMovedDispose?.Dispose();
-            
+
             _decreaseButton = e.NameScope.Find<Button>("PART_DecreaseButton");
             _track = e.NameScope.Find<Track>("PART_Track");
             _increaseButton = e.NameScope.Find<Button>("PART_IncreaseButton");
@@ -215,6 +216,7 @@ namespace Avalonia.Controls
             _pointerMovedDispose = this.AddDisposableHandler(PointerMovedEvent, TrackMoved, RoutingStrategies.Tunnel);
         }
 
+        /// <inheritdoc />
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
@@ -244,11 +246,11 @@ namespace Avalonia.Controls
                     break;
 
                 case Key.Home:
-                    Value = Minimum;
+                    SetCurrentValue(ValueProperty, Minimum);
                     break;
 
                 case Key.End:
-                    Value = Maximum;
+                    SetCurrentValue(ValueProperty, Maximum);
                     break;
 
                 default:
@@ -258,7 +260,7 @@ namespace Avalonia.Controls
 
             e.Handled = handled;
         }
-            
+
         private void MoveToNextTick(double direction)
         {
             if (direction == 0.0) return;
@@ -311,12 +313,18 @@ namespace Avalonia.Controls
             // Update if we've found a better value
             if (Math.Abs(next - value) > Tolerance)
             {
-                Value = next;
+                SetCurrentValue(ValueProperty, next);
             }
         }
 
         private void TrackMoved(object? sender, PointerEventArgs e)
         {
+            if (!IsEnabled)
+            {
+                _isDragging = false;
+                return;
+            }
+
             if (_isDragging)
             {
                 MoveToPoint(e.GetCurrentPoint(_track));
@@ -343,24 +351,25 @@ namespace Avalonia.Controls
                 return;
 
             var orient = Orientation == Orientation.Horizontal;
-            var thumbLength = (orient 
-                ? _track.Thumb.Bounds.Width 
-                : _track.Thumb.Bounds.Height) + double.Epsilon;
-            var trackLength = (orient 
-                ? _track.Bounds.Width 
+            var thumbLength = (orient
+                ? _track.Thumb?.Bounds.Width ?? 0.0
+                : _track.Thumb?.Bounds.Height ?? 0.0) + double.Epsilon;
+            var trackLength = (orient
+                ? _track.Bounds.Width
                 : _track.Bounds.Height) - thumbLength;
             var trackPos = orient ? posOnTrack.Position.X : posOnTrack.Position.Y;
             var logicalPos = MathUtilities.Clamp((trackPos - thumbLength * 0.5) / trackLength, 0.0d, 1.0d);
-            var invert = orient ? 
+            var invert = orient ?
                 IsDirectionReversed ? 1 : 0 :
                 IsDirectionReversed ? 0 : 1;
             var calcVal = Math.Abs(invert - logicalPos);
             var range = Maximum - Minimum;
             var finalValue = calcVal * range + Minimum;
 
-            Value = IsSnapToTickEnabled ? SnapToTick(finalValue) : finalValue;
+            SetCurrentValue(ValueProperty, IsSnapToTickEnabled ? SnapToTick(finalValue) : finalValue);
         }
 
+        /// <inheritdoc />
         protected override void UpdateDataValidation(
             AvaloniaProperty property,
             BindingValueType state,
@@ -372,6 +381,12 @@ namespace Avalonia.Controls
             }
         }
 
+        protected override AutomationPeer OnCreateAutomationPeer()
+        {
+            return new SliderAutomationPeer(this);
+        }
+
+        /// <inheritdoc />
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);

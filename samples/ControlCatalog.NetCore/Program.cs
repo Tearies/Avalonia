@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Fonts.Inter;
 using Avalonia.Headless;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
@@ -55,8 +56,7 @@ namespace ControlCatalog.NetCore
                 return builder
                     .UseHeadless(new AvaloniaHeadlessPlatformOptions
                     {
-                        UseHeadlessDrawing = true,
-                        UseCompositor = true
+                        UseHeadlessDrawing = true
                     })
                     .AfterSetup(_ =>
                     {
@@ -99,6 +99,15 @@ namespace ControlCatalog.NetCore
                 SilenceConsole();
                 return builder.StartLinuxDrm(args, scaling: GetScaling());
             }
+            else if (args.Contains("--dxgi"))
+            {
+                builder.With(new Win32PlatformOptions()
+                {
+                    UseLowLatencyDxgiSwapChain = true,
+                    UseWindowsUIComposition = false
+                });
+                return builder.StartWithClassicDesktopLifetime(args);
+            }
             else
                 return builder.StartWithClassicDesktopLifetime(args);
         }
@@ -116,6 +125,7 @@ namespace ControlCatalog.NetCore
                     EnableIme = true
                 })
                 .UseSkia()
+                .WithInterFont()
                 .AfterSetup(builder =>
                 {
                     builder.Instance!.AttachDevTools(new Avalonia.Diagnostics.DevToolsOptions()

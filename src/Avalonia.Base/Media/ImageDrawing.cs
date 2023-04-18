@@ -42,7 +42,7 @@ namespace Avalonia.Media
             var imageSource = ImageSource;
             var rect = Rect;
 
-            if (imageSource is object && !rect.IsEmpty)
+            if (imageSource is object && (rect.Width != 0 || rect.Height != 0))
             {
                 context.DrawImage(imageSource, rect);
             }

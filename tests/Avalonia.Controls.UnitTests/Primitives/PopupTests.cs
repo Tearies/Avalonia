@@ -18,6 +18,7 @@ using Avalonia.Input;
 using Avalonia.Rendering;
 using System.Threading.Tasks;
 using Avalonia.Threading;
+using Avalonia.Interactivity;
 
 namespace Avalonia.Controls.UnitTests.Primitives
 {
@@ -173,7 +174,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
 
             target.Child = child;
 
-            Assert.Null(((IVisual)child).VisualParent);
+            Assert.Null(((Visual)child).VisualParent);
         }
 
         [Fact]
@@ -206,7 +207,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
         {
             using (CreateServices())
             {
-                var target = new Popup() {PlacementMode = PlacementMode.Pointer};
+                var target = new Popup() {Placement = PlacementMode.Pointer};
                 var root = PreparedWindow(target);
 
                 target.Open();
@@ -225,7 +226,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
             using (CreateServices())
             {
                 var window = PreparedWindow();
-                var target = new Popup() {PlacementMode = PlacementMode.Pointer};
+                var target = new Popup() {Placement = PlacementMode.Pointer};
 
                 window.Content = target;
 
@@ -248,7 +249,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
             using (CreateServices())
             {
                 var window = PreparedWindow();
-                var target = new Popup() {PlacementMode = PlacementMode.Pointer};
+                var target = new Popup() {Placement = PlacementMode.Pointer};
 
                 window.Content = target;
                 window.ApplyTemplate();
@@ -273,7 +274,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
             using (CreateServices())
             {
                 var window = PreparedWindow();
-                var target = new Popup() { PlacementMode = PlacementMode.Pointer };
+                var target = new Popup() { Placement = PlacementMode.Pointer };
 
                 window.Content = target;
                 window.ApplyTemplate();
@@ -350,7 +351,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 }
 
                 var templatedParents = children
-                    .OfType<IControl>()
+                    .OfType<Control>()
                     .Select(x => x.TemplatedParent).ToList();
 
                 if (UsePopupHost)
@@ -394,7 +395,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 var item = new Border();
                 var root = PreparedWindow(target = new PopupItemsControl
                 {
-                    Items = new[] { item },
+                    Items = { item },
                     Template = new FuncControlTemplate<PopupItemsControl>(PopupItemsControlTemplate),
                 }); ;
                 root.Show();
@@ -443,7 +444,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 }
 
                 var templatedParents = children
-                    .OfType<IControl>()
+                    .OfType<Control>()
                     .Select(x => x.TemplatedParent).ToList();
 
                 if (UsePopupHost)
@@ -489,7 +490,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 var item = new Border();
                 var root = PreparedWindow(target = new PopupItemsControl
                 {
-                    Items = new[] { item },
+                    Items = { item },
                     Template = new FuncControlTemplate<PopupItemsControl>(PopupItemsControlTemplate),
                 });
                 root.Show();
@@ -563,12 +564,13 @@ namespace Avalonia.Controls.UnitTests.Primitives
         {
             using (CreateServices())
             {
-                var renderer = new Mock<IRenderer>();
-                var platform = AvaloniaLocator.Current.GetService<IWindowingPlatform>();
+                var renderer = RendererMocks.CreateRenderer();
+                var platform = AvaloniaLocator.Current.GetRequiredService<IWindowingPlatform>();
                 var windowImpl = Mock.Get(platform.CreateWindow());
                 windowImpl.Setup(x => x.CreateRenderer(It.IsAny<IRenderRoot>())).Returns(renderer.Object);
 
                 var window = new Window(windowImpl.Object);
+                window.ApplyStyling();
                 window.ApplyTemplate();
 
                 var target = new Popup() 
@@ -583,7 +585,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 window.Content = border;
 
                 renderer.Setup(x =>
-                    x.HitTestFirst(new Point(10, 15), window, It.IsAny<Func<IVisual, bool>>()))
+                    x.HitTestFirst(new Point(10, 15), window, It.IsAny<Func<Visual, bool>>()))
                     .Returns(border);
 
                 border.PointerPressed += (s, e) =>
@@ -740,7 +742,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 {
                     Width = 400,
                     Height = 200,
-                    PlacementMode = PlacementMode.Pointer
+                    Placement = PlacementMode.Pointer
                 };
                 var window = PreparedWindow(popup);
                 window.Show();
@@ -789,7 +791,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 var popup = new Popup()
                 {
                     PlacementTarget = placementTarget,
-                    PlacementMode = PlacementMode.Bottom,
+                    Placement = PlacementMode.Bottom,
                     Width = 10,
                     Height = 10
                 };
@@ -850,7 +852,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 var popup = new Popup()
                 {
                     PlacementTarget = placementTarget,
-                    PlacementMode = PlacementMode.Pointer,
+                    Placement = PlacementMode.Pointer,
                     Width = 10,
                     Height = 10
                 };
@@ -905,7 +907,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 var popup = new Popup()
                 {
                     PlacementTarget = placementTarget,
-                    PlacementMode = PlacementMode.Bottom,
+                    Placement = PlacementMode.Bottom,
                     Width = 10,
                     Height = 10
                 };
@@ -965,7 +967,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 var popup = new Popup()
                 {
                     PlacementTarget = placementTarget,
-                    PlacementMode = PlacementMode.Pointer,
+                    Placement = PlacementMode.Pointer,
                     Width = 10,
                     Height = 10
                 };
@@ -1018,7 +1020,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
                     Width = 20,
                     Height = 20,
                     PlacementTarget = parentPopup, 
-                    PlacementMode = PlacementMode.AnchorAndGravity,
+                    Placement = PlacementMode.AnchorAndGravity,
                     PlacementAnchor = PopupAnchor.TopLeft,
                     PlacementGravity = PopupGravity.BottomRight
                 };
@@ -1045,6 +1047,30 @@ namespace Avalonia.Controls.UnitTests.Primitives
                     Assert.True(raised);
                 }
             }            
+        }
+
+        [Fact]
+        public void Events_Should_Be_Routed_To_Popup_Parent()
+        {
+            using (CreateServices())
+            {
+                var popupContent = new Border();
+                var popup = new Popup { Child = popupContent };
+                var popupParent = new Border { Child = popup };
+                var root = PreparedWindow(popupParent);
+                var raised = 0;
+
+                root.LayoutManager.ExecuteInitialLayoutPass();
+                popup.Open();
+                root.LayoutManager.ExecuteLayoutPass();
+
+                var ev = new RoutedEventArgs(Button.ClickEvent);
+
+                popupParent.AddHandler(Button.ClickEvent, (s, e) => ++raised);
+                popupContent.RaiseEvent(ev);
+
+                Assert.Equal(1, raised);
+            }
         }
 
         private IDisposable CreateServices()
@@ -1074,7 +1100,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
         }
 
        
-        private PointerPressedEventArgs CreatePointerPressedEventArgs(Window source, Point p)
+        private static PointerPressedEventArgs CreatePointerPressedEventArgs(Window source, Point p)
         {
             var pointer = new Pointer(Pointer.GetNextFreeId(), PointerType.Mouse, true);
             return new PointerPressedEventArgs(
@@ -1087,14 +1113,16 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 KeyModifiers.None);
         }
 
-        private Window PreparedWindow(object content = null)
+        private static Window PreparedWindow(object content = null)
         {
             var w = new Window { Content = content };
+            w.Show();
+            w.ApplyStyling();
             w.ApplyTemplate();
             return w;
         }
 
-        private static IControl PopupContentControlTemplate(PopupContentControl control, INameScope scope)
+        private static Control PopupContentControlTemplate(PopupContentControl control, INameScope scope)
         {
             return new Popup
             {
@@ -1107,16 +1135,13 @@ namespace Avalonia.Controls.UnitTests.Primitives
             }.RegisterInNameScope(scope);
         }
 
-        private static IControl PopupItemsControlTemplate(PopupItemsControl control, INameScope scope)
+        private static Control PopupItemsControlTemplate(PopupItemsControl control, INameScope scope)
         {
             return new Popup
             {
                 Name = "popup",
                 PlacementTarget = control,
-                Child = new ItemsPresenter
-                {
-                    [~ItemsPresenter.ItemsProperty] = control[~ItemsControl.ItemsProperty],
-                }
+                Child = new ItemsPresenter(),
             }.RegisterInNameScope(scope);
         }
 
@@ -1132,7 +1157,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
         {
             public event EventHandler DataContextBeginUpdate;
 
-            public new IAvaloniaObject InheritanceParent => base.InheritanceParent;
+            public new AvaloniaObject InheritanceParent => base.InheritanceParent;
 
             protected override void OnDataContextBeginUpdate()
             {

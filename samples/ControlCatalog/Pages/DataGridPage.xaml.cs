@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using Avalonia.Controls;
@@ -35,7 +36,7 @@ namespace ControlCatalog.Pages
                     collectionView1.SortDescriptions.Add(dataGridSortDescription);
                 }
             };
-            dg1.Items = collectionView1;
+            dg1.ItemsSource = collectionView1;
 
             var dg2 = this.Get<DataGrid>("dataGridGrouping");
             dg2.IsReadOnly = true;
@@ -43,25 +44,27 @@ namespace ControlCatalog.Pages
             var collectionView2 = new DataGridCollectionView(Countries.All);
             collectionView2.GroupDescriptions.Add(new DataGridPathGroupDescription("Region"));
 
-            dg2.Items = collectionView2;
+            dg2.ItemsSource = collectionView2;
 
             var dg3 = this.Get<DataGrid>("dataGridEdit");
             dg3.IsReadOnly = false;
 
-            var items = new List<Person>
+            var list = new ObservableCollection<Person>
             {
                 new Person { FirstName = "John", LastName = "Doe" , Age = 30},
                 new Person { FirstName = "Elizabeth", LastName = "Thomas", IsBanned = true , Age = 40 },
                 new Person { FirstName = "Zack", LastName = "Ward" , Age = 50 }
             };
-            var collectionView3 = new DataGridCollectionView(items);
-
-            dg3.Items = collectionView3;
+            DataGrid3Source = list;
 
             var addButton = this.Get<Button>("btnAdd");
-            addButton.Click += (a, b) => collectionView3.AddNew();
+            addButton.Click += (a, b) => list.Add(new Person());
+
+            DataContext = this;
         }
 
+        public IEnumerable<Person> DataGrid3Source { get; }
+        
         private void Dg1_LoadingRow(object? sender, DataGridRowEventArgs e)
         {
             e.Row.Header = e.Row.GetIndex() + 1;

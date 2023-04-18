@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using Avalonia.Compatibility;
 using Avalonia.Platform;
 using Avalonia.Platform.Interop;
 using Avalonia.SourceGenerator;
@@ -24,10 +25,9 @@ namespace Avalonia.OpenGL.Egl
 
         static Func<string, IntPtr> Load()
         {
-            var os = AvaloniaLocator.Current.GetService<IRuntimePlatform>().GetRuntimeInfo().OperatingSystem;
-            if(os == OperatingSystemType.Linux)
+            if(OperatingSystemEx.IsLinux())
                 return Load("libEGL.so.1");
-            if (os == OperatingSystemType.Android)
+            if (OperatingSystemEx.IsAndroid())
                 return Load("libEGL.so");
 
             throw new PlatformNotSupportedException();
@@ -35,7 +35,7 @@ namespace Avalonia.OpenGL.Egl
 
         static Func<string, IntPtr> Load(string library)
         {
-            var dyn = AvaloniaLocator.Current.GetService<IDynamicLibraryLoader>();
+            var dyn = AvaloniaLocator.Current.GetRequiredService<IDynamicLibraryLoader>();
             var lib = dyn.LoadLibrary(library);
             return (s) => dyn.GetProcAddress(lib, s, true);
         }
@@ -49,10 +49,13 @@ namespace Avalonia.OpenGL.Egl
         public partial IntPtr GetDisplay(IntPtr nativeDisplay);
         
         [GetProcAddress("eglGetPlatformDisplayEXT", true)]
-        public partial IntPtr GetPlatformDisplayExt(int platform, IntPtr nativeDisplay, int[] attrs);
+        public partial IntPtr GetPlatformDisplayExt(int platform, IntPtr nativeDisplay, int[]? attrs);
 
         [GetProcAddress("eglInitialize")]        
         public partial bool Initialize(IntPtr display, out int major, out int minor);
+        
+        [GetProcAddress("eglTerminate")]        
+        public partial void Terminate(IntPtr display);
 
         [GetProcAddress("eglGetProcAddress")]        
         public partial IntPtr GetProcAddress(IntPtr proc);
@@ -72,7 +75,7 @@ namespace Avalonia.OpenGL.Egl
         public partial bool DestroyContext(IntPtr display, IntPtr context);
         
         [GetProcAddress("eglCreatePbufferSurface")]
-        public partial IntPtr CreatePBufferSurface(IntPtr display, IntPtr config, int[] attrs);
+        public partial IntPtr CreatePBufferSurface(IntPtr display, IntPtr config, int[]? attrs);
 
         [GetProcAddress("eglMakeCurrent")]
         public partial bool MakeCurrent(IntPtr display, IntPtr draw, IntPtr read, IntPtr context);
@@ -93,7 +96,10 @@ namespace Avalonia.OpenGL.Egl
         public partial void SwapBuffers(IntPtr display, IntPtr surface);
 
         [GetProcAddress("eglCreateWindowSurface")]
-        public partial IntPtr CreateWindowSurface(IntPtr display, IntPtr config, IntPtr window, int[] attrs);
+        public partial IntPtr CreateWindowSurface(IntPtr display, IntPtr config, IntPtr window, int[]? attrs);
+
+        [GetProcAddress("eglBindTexImage")]
+        public partial int BindTexImage(IntPtr display, IntPtr surface, int buffer);
 
         [GetProcAddress("eglGetConfigAttrib")]
         public partial bool GetConfigAttrib(IntPtr display, IntPtr config, int attr, out int rv);
@@ -110,7 +116,7 @@ namespace Avalonia.OpenGL.Egl
         [GetProcAddress("eglQueryString")]
         public partial IntPtr QueryStringNative(IntPtr display, int i);
         
-        public string QueryString(IntPtr display, int i)
+        public string? QueryString(IntPtr display, int i)
         {
             var rv = QueryStringNative(display, i);
             if (rv == IntPtr.Zero)
@@ -119,7 +125,7 @@ namespace Avalonia.OpenGL.Egl
         }
         
         [GetProcAddress("eglCreatePbufferFromClientBuffer")]
-        public partial IntPtr CreatePbufferFromClientBuffer(IntPtr display, int buftype, IntPtr buffer, IntPtr config, int[] attrib_list);
+        public partial IntPtr CreatePbufferFromClientBuffer(IntPtr display, int buftype, IntPtr buffer, IntPtr config, int[]? attrib_list);
         
         [GetProcAddress("eglQueryDisplayAttribEXT", true)]
         public partial bool QueryDisplayAttribExt(IntPtr display, int attr, out IntPtr res);

@@ -2,14 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using Avalonia.Automation.Peers;
-using Avalonia.Controls.Documents;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
-using Avalonia.Media;
 using Avalonia.Rendering;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -26,13 +24,13 @@ namespace Avalonia.Controls
     /// - A <see cref="Tag"/> property to allow user-defined data to be attached to the control.
     /// - <see cref="ContextRequestedEvent"/> and other context menu related members.
     /// </remarks>
-    public class Control : InputElement, IControl, INamed, IVisualBrushInitialize, ISetterValue
+    public class Control : InputElement, IDataTemplateHost, INamed, IVisualBrushInitialize, ISetterValue
     {
         /// <summary>
         /// Defines the <see cref="FocusAdorner"/> property.
         /// </summary>
-        public static readonly StyledProperty<ITemplate<IControl>?> FocusAdornerProperty =
-            AvaloniaProperty.Register<Control, ITemplate<IControl>?>(nameof(FocusAdorner));
+        public static readonly StyledProperty<ITemplate<Control>?> FocusAdornerProperty =
+            AvaloniaProperty.Register<Control, ITemplate<Control>?>(nameof(FocusAdorner));
 
         /// <summary>
         /// Defines the <see cref="Tag"/> property.
@@ -91,13 +89,6 @@ namespace Avalonia.Controls
             RoutedEvent.Register<Control, SizeChangedEventArgs>(
                 nameof(SizeChanged), RoutingStrategies.Direct);
 
-        /// <summary>
-        /// Defines the <see cref="FlowDirection"/> property.
-        /// </summary>
-        public static readonly AttachedProperty<FlowDirection> FlowDirectionProperty =
-            AvaloniaProperty.RegisterAttached<Control, Control, FlowDirection>(
-                nameof(FlowDirection),
-                inherits: true);
 
         // Note the following:
         // _loadedQueue :
@@ -114,13 +105,13 @@ namespace Avalonia.Controls
 
         private bool _isLoaded = false;
         private DataTemplates? _dataTemplates;
-        private IControl? _focusAdorner;
+        private Control? _focusAdorner;
         private AutomationPeer? _automationPeer;
 
         /// <summary>
         /// Gets or sets the control's focus adorner.
         /// </summary>
-        public ITemplate<IControl>? FocusAdorner
+        public ITemplate<Control>? FocusAdorner
         {
             get => GetValue(FocusAdornerProperty);
             set => SetValue(FocusAdornerProperty, value);
@@ -172,15 +163,6 @@ namespace Avalonia.Controls
         }
         
         /// <summary>
-        /// Gets or sets the text flow direction.
-        /// </summary>
-        public FlowDirection FlowDirection
-        {
-            get => GetValue(FlowDirectionProperty);
-            set => SetValue(FlowDirectionProperty, value);
-        }
-
-        /// <summary>
         /// Occurs when the user has completed a context input gesture, such as a right-click.
         /// </summary>
         public event EventHandler<ContextRequestedEventArgs>? ContextRequested
@@ -227,40 +209,8 @@ namespace Avalonia.Controls
             remove => RemoveHandler(SizeChangedEvent, value);
         }
 
-        public new IControl? Parent => (IControl?)base.Parent;
-
-        /// <summary>
-        /// Gets the value of the attached <see cref="FlowDirectionProperty"/> on a control.
-        /// </summary>
-        /// <param name="control">The control.</param>
-        /// <returns>The flow direction.</returns>
-        public static FlowDirection GetFlowDirection(Control control)
-        {
-            return control.GetValue(FlowDirectionProperty);
-        }
-
-        /// <summary>
-        /// Sets the value of the attached <see cref="FlowDirectionProperty"/> on a control.
-        /// </summary>
-        /// <param name="control">The control.</param>
-        /// <param name="value">The property value to set.</param>
-        public static void SetFlowDirection(Control control, FlowDirection value)
-        {
-            control.SetValue(FlowDirectionProperty, value);
-        }
-
         /// <inheritdoc/>
         bool IDataTemplateHost.IsDataTemplatesInitialized => _dataTemplates != null;
-
-        /// <summary>
-        /// Gets a value indicating whether control bypass FlowDirecton policies.
-        /// </summary>
-        /// <remarks>
-        /// Related to FlowDirection system and returns false as default, so if 
-        /// <see cref="FlowDirection"/> is RTL then control will get a mirror presentation. 
-        /// For controls that want to avoid this behavior, override this property and return true.
-        /// </remarks>
-        protected virtual bool BypassFlowDirectionPolicies => false;
 
         /// <inheritdoc/>
         void ISetterValue.Initialize(ISetter setter)
@@ -283,7 +233,7 @@ namespace Avalonia.Controls
                 {
                     foreach (var i in this.GetSelfAndVisualDescendants())
                     {
-                        var c = i as IControl;
+                        var c = i as Control;
 
                         if (c?.IsInitialized == false && c is ISupportInitialize init)
                         {
@@ -305,7 +255,7 @@ namespace Avalonia.Controls
         /// Gets the element that receives the focus adorner.
         /// </summary>
         /// <returns>The control that receives the focus adorner.</returns>
-        protected virtual IControl? GetTemplateFocusTarget() => this;
+        protected virtual Control? GetTemplateFocusTarget() => this;
 
         private static Action loadedProcessingAction = () =>
         {
@@ -412,9 +362,20 @@ namespace Avalonia.Controls
         {
             base.OnAttachedToVisualTreeCore(e);
 
+            AddHandler(Gestures.HoldingEvent, OnHoldEvent);
+
             InitializeIfNeeded();
 
             ScheduleOnLoadedCore();
+        }
+
+        private void OnHoldEvent(object? sender, HoldingRoutedEventArgs e)
+        {
+            if(e.HoldingState == HoldingState.Started)
+            {
+                // Trigger ContentRequest when hold has started
+                RaiseEvent(new ContextRequestedEventArgs());
+            }
         }
 
         /// <inheritdoc/>
@@ -422,15 +383,9 @@ namespace Avalonia.Controls
         {
             base.OnDetachedFromVisualTreeCore(e);
 
+            RemoveHandler(Gestures.HoldingEvent, OnHoldEvent);
+
             OnUnloadedCore();
-        }
-
-        /// <inheritdoc/>
-        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
-        {
-            base.OnAttachedToVisualTree(e);
-
-            InvalidateMirrorTransform();
         }
 
         /// <inheritdoc/>
@@ -448,7 +403,7 @@ namespace Avalonia.Controls
                 {
                     if (_focusAdorner == null)
                     {
-                        var template = GetValue(FocusAdornerProperty);
+                        var template = GetValue(FocusAdornerProperty) ?? adornerLayer.DefaultFocusAdorner;
 
                         if (template != null)
                         {
@@ -472,7 +427,7 @@ namespace Avalonia.Controls
 
             if (_focusAdorner?.Parent != null)
             {
-                var adornerLayer = (IPanel)_focusAdorner.Parent;
+                var adornerLayer = (Panel)_focusAdorner.Parent;
                 adornerLayer.Children.Remove(_focusAdorner);
                 _focusAdorner = null;
             }
@@ -571,45 +526,14 @@ namespace Avalonia.Controls
                     RaiseEvent(sizeChangedEventArgs);
                 }
             }
-            else if (change.Property == FlowDirectionProperty)
-            {
-                InvalidateMirrorTransform();
-
-                foreach (var visual in VisualChildren)
-                {
-                    if (visual is Control child)
-                    {
-                        child.InvalidateMirrorTransform();
-                    }
-                }
-            }
         }
 
-        /// <summary>
-        /// Computes the <see cref="IVisual.HasMirrorTransform"/> value according to the 
-        /// <see cref="FlowDirection"/> and <see cref="BypassFlowDirectionPolicies"/>
-        /// </summary>
-        public virtual void InvalidateMirrorTransform()
+        // Since we are resetting the dispatcher instance, the callback might never arrive
+        internal static void ResetLoadedQueueForUnitTests()
         {
-            var flowDirection = this.FlowDirection;
-            var parentFlowDirection = FlowDirection.LeftToRight;
-
-            bool bypassFlowDirectionPolicies = BypassFlowDirectionPolicies;
-            bool parentBypassFlowDirectionPolicies = false;
-
-            var parent = ((IVisual)this).VisualParent as Control;
-            if (parent != null)
-            {
-                parentFlowDirection = parent.FlowDirection;
-                parentBypassFlowDirectionPolicies = parent.BypassFlowDirectionPolicies;
-            }
-
-            bool thisShouldBeMirrored = flowDirection == FlowDirection.RightToLeft && !bypassFlowDirectionPolicies;
-            bool parentShouldBeMirrored = parentFlowDirection == FlowDirection.RightToLeft && !parentBypassFlowDirectionPolicies;
-
-            bool shouldApplyMirrorTransform = thisShouldBeMirrored != parentShouldBeMirrored;
-
-            HasMirrorTransform = shouldApplyMirrorTransform;
+            _loadedQueue.Clear();
+            _loadedProcessingQueue.Clear();
+            _isLoadedProcessing = false;
         }
     }
 }

@@ -18,7 +18,7 @@ namespace Avalonia.Benchmarks.Layout
             _app = UnitTestApplication.Start(
                 TestServices.StyledWindow.With(
                     renderInterface: new NullRenderingPlatform(),
-                    threadingInterface: new NullThreadingPlatform(),
+                    dispatcherImpl: new NullThreadingPlatform(),
                     standardCursorFactory: new NullCursorFactory()));
 
             _root = new TestRoot(true, null)
@@ -50,6 +50,42 @@ namespace Avalonia.Benchmarks.Layout
             var calendar = new Calendar();
 
             _root.Child = calendar;
+
+            _root.LayoutManager.ExecuteLayoutPass();
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Loaded);
+        }
+
+        [Benchmark]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public void CreateControl()
+        {
+            var control = new Control();
+            
+            _root.Child = control;
+
+            _root.LayoutManager.ExecuteLayoutPass();
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Loaded);
+        }
+
+        [Benchmark]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public void CreateDecorator()
+        {
+            var control = new Decorator();
+            
+            _root.Child = control;
+
+            _root.LayoutManager.ExecuteLayoutPass();
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Loaded);
+        }
+
+        [Benchmark]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public void CreateScrollViewer()
+        {
+            var control = new ScrollViewer();
+            
+            _root.Child = control;
 
             _root.LayoutManager.ExecuteLayoutPass();
             Dispatcher.UIThread.RunJobs(DispatcherPriority.Loaded);

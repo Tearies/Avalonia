@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Embedding;
 using Avalonia.Controls.Platform;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Input.Raw;
 using Avalonia.Input.TextInput;
 using Avalonia.iOS.Storage;
@@ -16,6 +17,7 @@ using Foundation;
 using ObjCRuntime;
 using OpenGLES;
 using UIKit;
+using IInsetsManager = Avalonia.Controls.Platform.IInsetsManager;
 
 namespace Avalonia.iOS
 {
@@ -26,6 +28,7 @@ namespace Avalonia.iOS
         private EmbeddableControlRoot _topLevel;
         private TouchHandler _touches;
         private ITextInputMethodClient _client;
+        private IAvaloniaViewController _controller;
 
         public AvaloniaView()
         {
@@ -48,21 +51,58 @@ namespace Avalonia.iOS
             MultipleTouchEnabled = true;
         }
 
+        /// <inheritdoc />
         public override bool CanBecomeFirstResponder => true;
 
+        /// <inheritdoc />
         public override bool CanResignFirstResponder => true;
 
-        internal class TopLevelImpl : ITopLevelImplWithTextInputMethod, ITopLevelImplWithNativeControlHost,
-            ITopLevelImplWithStorageProvider
+        /// <inheritdoc />
+        public override void TraitCollectionDidChange(UITraitCollection previousTraitCollection)
+        {
+            base.TraitCollectionDidChange(previousTraitCollection);
+            
+            var settings = AvaloniaLocator.Current.GetRequiredService<IPlatformSettings>() as PlatformSettings;
+            settings?.TraitCollectionDidChange();
+        }
+
+        /// <inheritdoc />
+        public override void TintColorDidChange()
+        {
+            base.TintColorDidChange();
+            
+            var settings = AvaloniaLocator.Current.GetRequiredService<IPlatformSettings>() as PlatformSettings;
+            settings?.TraitCollectionDidChange();
+        }
+
+        public void InitWithController<TController>(TController controller)
+            where TController : UIViewController, IAvaloniaViewController
+        {
+            _controller = controller;
+            _topLevelImpl._insetsManager.InitWithController(controller);
+        }
+        
+        internal class TopLevelImpl : ITopLevelImpl
         {
             private readonly AvaloniaView _view;
+            private readonly INativeControlHostImpl _nativeControlHost;
+            private readonly IStorageProvider _storageProvider;
+            internal readonly InsetsManager _insetsManager;
+            private readonly ClipboardImpl _clipboard;
+
             public AvaloniaView View => _view;
 
             public TopLevelImpl(AvaloniaView view)
             {
                 _view = view;
-                NativeControlHost = new NativeControlHostImpl(_view);
-                StorageProvider = new IOSStorageProvider(view);
+                _nativeControlHost = new NativeControlHostImpl(view);
+                _storageProvider = new IOSStorageProvider(view);
+                _insetsManager = new InsetsManager(view);
+                _insetsManager.DisplayEdgeToEdgeChanged += (sender, b) =>
+                {
+                    view._topLevel.Padding = b ? default : _insetsManager.SafeAreaPadding;
+                };
+                _clipboard = new ClipboardImpl();
             }
 
             public void Dispose()
@@ -70,7 +110,8 @@ namespace Avalonia.iOS
                 // No-op
             }
 
-            public IRenderer CreateRenderer(IRenderRoot root) => new CompositingRenderer(root, Platform.Compositor);
+            public IRenderer CreateRenderer(IRenderRoot root) =>
+                new CompositingRenderer(root, Platform.Compositor, () => Surfaces);
 
 
             public void Invalidate(Rect rect)
@@ -119,13 +160,53 @@ namespace Avalonia.iOS
             // legacy no-op
             public IMouseDevice MouseDevice { get; } = new MouseDevice();
             public WindowTransparencyLevel TransparencyLevel { get; }
-
+            
+            public void SetFrameThemeVariant(PlatformThemeVariant themeVariant)
+            {
+                // TODO adjust status bar depending on full screen mode.
+                if (OperatingSystem.IsIOSVersionAtLeast(13) && _view._controller is not null)
+                {
+                    _view._controller.PreferredStatusBarStyle = themeVariant switch
+                    {
+                        PlatformThemeVariant.Light => UIStatusBarStyle.DarkContent,
+                        PlatformThemeVariant.Dark => UIStatusBarStyle.LightContent,
+                        _ => UIStatusBarStyle.Default
+                    };
+                }
+            }
+            
             public AcrylicPlatformCompensationLevels AcrylicCompensationLevels { get; } =
                 new AcrylicPlatformCompensationLevels();
 
-            public ITextInputMethodImpl? TextInputMethod => _view;
-            public INativeControlHostImpl NativeControlHost { get; }
-            public IStorageProvider StorageProvider { get; }
+            public object? TryGetFeature(Type featureType)
+            {
+                if (featureType == typeof(IStorageProvider))
+                {
+                    return _storageProvider;
+                }
+
+                if (featureType == typeof(ITextInputMethodImpl))
+                {
+                    return _view;
+                }
+
+                if (featureType == typeof(INativeControlHostImpl))
+                {
+                    return _nativeControlHost;
+                }
+
+                if (featureType == typeof(IInsetsManager))
+                {
+                    return _insetsManager;
+                }
+
+                if (featureType == typeof(IClipboard))
+                {
+                    return _clipboard;
+                }
+
+                return null;
+            }
         }
 
         [Export("layerClass")]

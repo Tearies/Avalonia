@@ -336,21 +336,21 @@ namespace Avalonia.Base.UnitTests.Layout
             });
         }
 
-        private TestRoot CreateRoot() => new TestRoot { Width = 1200, Height = 900 };
+        private static TestRoot CreateRoot() => new TestRoot { Width = 1200, Height = 900 };
 
-        private Task ExecuteInitialLayoutPass(TestRoot root)
+        private static Task ExecuteInitialLayoutPass(TestRoot root)
         {
             root.LayoutManager.ExecuteInitialLayoutPass();
             return Task.CompletedTask;
         }
 
-        private Task ExecuteLayoutPass(TestRoot root)
+        private static Task ExecuteLayoutPass(TestRoot root)
         {
             root.LayoutManager.ExecuteLayoutPass();
             return Task.CompletedTask;
         }
 
-        private Task ExecuteScrollerLayoutPass(
+        private static Task ExecuteScrollerLayoutPass(
             TestRoot root,
             ScrollViewer scroller,
             Control target,
@@ -365,7 +365,7 @@ namespace Avalonia.Base.UnitTests.Layout
             root.LayoutManager.ExecuteLayoutPass();
             return Task.CompletedTask;
         }
-        private IControlTemplate ScrollViewerTemplate()
+        private static IControlTemplate ScrollViewerTemplate()
         {
             return new FuncControlTemplate<ScrollViewer>((control, scope) => new Grid
             {
@@ -384,38 +384,24 @@ namespace Avalonia.Base.UnitTests.Layout
                     new ScrollContentPresenter
                     {
                         Name = "PART_ContentPresenter",
-                        [~ContentPresenter.ContentProperty] = control[~ContentControl.ContentProperty],
-                        [~~ScrollContentPresenter.ExtentProperty] = control[~~ScrollViewer.ExtentProperty],
-                        [~~ScrollContentPresenter.OffsetProperty] = control[~~ScrollViewer.OffsetProperty],
-                        [~~ScrollContentPresenter.ViewportProperty] = control[~~ScrollViewer.ViewportProperty],
-                        [~ScrollContentPresenter.CanHorizontallyScrollProperty] = control[~ScrollViewer.CanHorizontallyScrollProperty],
-                        [~ScrollContentPresenter.CanVerticallyScrollProperty] = control[~ScrollViewer.CanVerticallyScrollProperty],
                     }.RegisterInNameScope(scope),
                     new ScrollBar
                     {
                         Name = "horizontalScrollBar",
                         Orientation = Orientation.Horizontal,
-                        [~RangeBase.MaximumProperty] = control[~ScrollViewer.HorizontalScrollBarMaximumProperty],
-                        [~~RangeBase.ValueProperty] = control[~~ScrollViewer.HorizontalScrollBarValueProperty],
-                        [~ScrollBar.ViewportSizeProperty] = control[~ScrollViewer.HorizontalScrollBarViewportSizeProperty],
-                        [~ScrollBar.VisibilityProperty] = control[~ScrollViewer.HorizontalScrollBarVisibilityProperty],
                         [Grid.RowProperty] = 1,
                     }.RegisterInNameScope(scope),
                     new ScrollBar
                     {
                         Name = "verticalScrollBar",
                         Orientation = Orientation.Vertical,
-                        [~RangeBase.MaximumProperty] = control[~ScrollViewer.VerticalScrollBarMaximumProperty],
-                        [~~RangeBase.ValueProperty] = control[~~ScrollViewer.VerticalScrollBarValueProperty],
-                        [~ScrollBar.ViewportSizeProperty] = control[~ScrollViewer.VerticalScrollBarViewportSizeProperty],
-                        [~ScrollBar.VisibilityProperty] = control[~ScrollViewer.VerticalScrollBarVisibilityProperty],
                         [Grid.ColumnProperty] = 1,
                     }.RegisterInNameScope(scope),
                 },
             });
         }
 
-        private void AssertArePixelEqual(Rect expected, Rect actual)
+        private static void AssertArePixelEqual(Rect expected, Rect actual)
         {
             var expectedRounded = new Rect((int)expected.X, (int)expected.Y, (int)expected.Width, (int)expected.Height);
             var actualRounded = new Rect((int)actual.X, (int)actual.Y, (int)actual.Width, (int)actual.Height);

@@ -1,15 +1,13 @@
-using Avalonia.Controls.Generators;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
-using Avalonia.VisualTree;
 
 namespace Avalonia.Controls.Primitives
 {
     public class TabStrip : SelectingItemsControl
     {
-        private static readonly FuncTemplate<IPanel> DefaultPanel =
-            new FuncTemplate<IPanel>(() => new WrapPanel { Orientation = Orientation.Horizontal });
+        private static readonly FuncTemplate<Panel?> DefaultPanel =
+            new(() => new WrapPanel { Orientation = Orientation.Horizontal });
 
         static TabStrip()
         {
@@ -18,13 +16,8 @@ namespace Avalonia.Controls.Primitives
             ItemsPanelProperty.OverrideDefaultValue<TabStrip>(DefaultPanel);
         }
 
-        protected override IItemContainerGenerator CreateItemContainerGenerator()
-        {
-            return new ItemContainerGenerator<TabStripItem>(
-                this,
-                ContentControl.ContentProperty,
-                ContentControl.ContentTemplateProperty);
-        }
+        protected internal override Control CreateContainerForItemOverride() => new TabStripItem();
+        protected internal override bool IsItemItsOwnContainerOverride(Control item) => item is TabStripItem;
 
         /// <inheritdoc/>
         protected override void OnGotFocus(GotFocusEventArgs e)
@@ -42,7 +35,7 @@ namespace Avalonia.Controls.Primitives
         {
             base.OnPointerPressed(e);
 
-            if (e.Source is IVisual source)
+            if (e.Source is Visual source)
             {
                 var point = e.GetCurrentPoint(source);
 

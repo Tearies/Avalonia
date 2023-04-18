@@ -131,7 +131,7 @@ namespace Avalonia.Media
         /// </summary>
         /// <remarks>
         /// <list type="bullet">
-        ///   <item>0 is a shade of gray (no color).</item>
+        ///   <item>0 is fully white (or a shade of gray) and shows no color.</item>
         ///   <item>1 is the full color.</item>
         /// </list>
         /// </remarks>
@@ -254,7 +254,7 @@ namespace Avalonia.Media
         /// <param name="s">The HSV color string to parse.</param>
         /// <param name="hsvColor">The parsed <see cref="HsvColor"/>.</param>
         /// <returns>True if parsing was successful; otherwise, false.</returns>
-        public static bool TryParse(string s, out HsvColor hsvColor)
+        public static bool TryParse(string? s, out HsvColor hsvColor)
         {
             bool prefixMatched = false;
 

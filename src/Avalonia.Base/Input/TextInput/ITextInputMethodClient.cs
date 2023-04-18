@@ -1,4 +1,5 @@
 using System;
+using Avalonia.Media.TextFormatting;
 using Avalonia.VisualTree;
 
 namespace Avalonia.Input.TextInput
@@ -16,7 +17,7 @@ namespace Avalonia.Input.TextInput
         /// <summary>
         /// The visual that's showing the text
         /// </summary>
-        IVisual TextViewVisual { get; }
+        Visual TextViewVisual { get; }
         /// <summary>
         /// Should be fired when text-hosting visual is changed
         /// </summary>
@@ -31,6 +32,11 @@ namespace Avalonia.Input.TextInput
         void SetPreeditText(string? text);
 
         /// <summary>
+        /// Sets the current composing region. This doesn't remove the composing text from the commited text.
+        /// </summary>
+        void SetComposingRegion(TextRange? region);
+
+        /// <summary>
         /// Indicates if text input client is capable of providing the text around the cursor
         /// </summary>
         bool SupportsSurroundingText { get; }
@@ -43,10 +49,15 @@ namespace Avalonia.Input.TextInput
         /// </summary>
         event EventHandler? SurroundingTextChanged;
 
+        /// <summary>
+        /// Gets or sets a platform editable. Text and selection changes made in the editable are forwarded to the IM client.
+        /// </summary>
+        ITextEditable? TextEditable { get; set; }
+
         void SelectInSurroundingText(int start, int end);
     }
 
-    public struct TextInputMethodSurroundingText
+    public record struct TextInputMethodSurroundingText
     {
         public string Text { get; set; }
         public int CursorOffset { get; set; }

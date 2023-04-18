@@ -147,16 +147,11 @@ namespace Avalonia.Media
         /// <param name="s">The color string.</param>
         /// <param name="color">The parsed color</param>
         /// <returns>The status of the operation.</returns>
-        public static bool TryParse(string s, out Color color)
+        public static bool TryParse(string? s, out Color color)
         {
             color = default;
 
-            if (s is null)
-            {
-                return false;
-            }
-
-            if (s.Length == 0)
+            if (string.IsNullOrEmpty(s))
             {
                 return false;
             }
@@ -314,7 +309,7 @@ namespace Avalonia.Media
             if (input.Length == 3 || input.Length == 4)
             {
                 var extendedLength = 2 * input.Length;
-                
+
 #if !BUILDTASK
                 Span<char> extended = stackalloc char[extendedLength];
 #else
@@ -336,7 +331,7 @@ namespace Avalonia.Media
         /// <summary>
         /// Parses the given string representing a CSS color value into a new <see cref="Color"/>.
         /// </summary>
-        private static bool TryParseCssFormat(string s, out Color color)
+        private static bool TryParseCssFormat(string? s, out Color color)
         {
             bool prefixMatched = false;
 

@@ -20,13 +20,13 @@ public interface IStorageItem : IDisposable
     string Name { get; }
 
     /// <summary>
-    /// Gets the full file-system path of the item, if the item has a path.
+    /// Gets the file-system path of the item.
     /// </summary>
     /// <remarks>
     /// Android backend might return file path with "content:" scheme.
     /// Browser and iOS backends might return relative uris.
     /// </remarks>
-    bool TryGetUri([NotNullWhen(true)] out Uri? uri);
+    Uri Path { get; }
 
     /// <summary>
     /// Gets the basic properties of the current item.
@@ -50,4 +50,17 @@ public interface IStorageItem : IDisposable
     /// Gets the parent folder of the current storage item.
     /// </summary>
     Task<IStorageFolder?> GetParentAsync();
+
+    /// <summary>
+    /// Deletes the current storage item and it's contents
+    /// </summary>
+    /// <returns></returns>
+    Task DeleteAsync();
+
+    /// <summary>
+    /// Moves the current storage item and it's contents to a <see cref="IStorageFolder"/>
+    /// </summary>
+    /// <param name="destination">The <see cref="IStorageFolder"/> to move the item into</param>
+    /// <returns></returns>
+    Task<IStorageItem?> MoveAsync(IStorageFolder destination);
 }

@@ -34,6 +34,7 @@ namespace Avalonia.Skia.Helpers
         /// Save Skia image to a stream.
         /// </summary>
         /// <param name="image">Image to save</param>
+        /// <param name="stream">The output stream to save the image.</param>
         /// <param name="quality">
         /// The optional quality for PNG compression. 
         /// The quality value is interpreted from 0 - 100. If quality is null 
@@ -58,6 +59,16 @@ namespace Avalonia.Skia.Helpers
                     data.SaveTo(stream);
                 }
             }
+        }
+
+        // This method is here mostly for debugging purposes
+        internal static void SavePicture(SKPicture picture, float scale, string path)
+        {
+            var snapshotSize = new SKSizeI((int)Math.Ceiling(picture.CullRect.Width * scale),
+                (int)Math.Ceiling(picture.CullRect.Height * scale));
+            using var snap =
+                SKImage.FromPicture(picture, snapshotSize, SKMatrix.CreateScale(scale, scale));
+            SaveImage(snap, path);
         }
     }
 }

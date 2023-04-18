@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Media.TextFormatting;
 using Avalonia.Metadata;
 
 namespace Avalonia.Platform
@@ -47,7 +48,7 @@ namespace Avalonia.Platform
         /// <param name="fillRule">The fill rule.</param>
         /// <param name="children">The geometries to group.</param>
         /// <returns>A combined geometry.</returns>
-        IGeometryImpl CreateGeometryGroup(FillRule fillRule, IReadOnlyList<Geometry> children);
+        IGeometryImpl CreateGeometryGroup(FillRule fillRule, IReadOnlyList<IGeometryImpl> children);
 
         /// <summary>
         /// Creates a geometry group implementation.
@@ -56,7 +57,7 @@ namespace Avalonia.Platform
         /// <param name="g1">The first geometry.</param>
         /// <param name="g2">The second geometry.</param>
         /// <returns>A combined geometry.</returns>
-        IGeometryImpl CreateCombinedGeometry(GeometryCombineMode combineMode, Geometry g1, Geometry g2);
+        IGeometryImpl CreateCombinedGeometry(GeometryCombineMode combineMode, IGeometryImpl g1, IGeometryImpl g2);
 
         /// <summary>
         /// Created a geometry implementation for the glyph run.
@@ -64,15 +65,6 @@ namespace Avalonia.Platform
         /// <param name="glyphRun">The glyph run to build a geometry from.</param>
         /// <returns>The geometry returned contains the combined geometry of all glyphs in the glyph run.</returns>
         IGeometryImpl BuildGlyphRunGeometry(GlyphRun glyphRun);
-
-        /// <summary>
-        /// Creates a renderer.
-        /// </summary>
-        /// <param name="surfaces">
-        /// The list of native platform surfaces that can be used for output.
-        /// </param>
-        /// <returns>An <see cref="IRenderTarget"/>.</returns>
-        IRenderTarget CreateRenderTarget(IEnumerable<object> surfaces);
 
         /// <summary>
         /// Creates a render target bitmap implementation.
@@ -175,12 +167,18 @@ namespace Avalonia.Platform
         /// </summary>
         /// <param name="glyphTypeface">The glyph typeface.</param>
         /// <param name="fontRenderingEmSize">The font rendering em size.</param>
-        /// <param name="glyphIndices">The glyph indices.</param>
-        /// <param name="glyphAdvances">The glyph advances.</param>
-        /// <param name="glyphOffsets">The glyph offsets.</param>
-        /// <returns></returns>
-        IGlyphRunImpl CreateGlyphRun(IGlyphTypeface glyphTypeface, double fontRenderingEmSize, IReadOnlyList<ushort> glyphIndices, IReadOnlyList<double>? glyphAdvances, IReadOnlyList<Vector>? glyphOffsets);
+        /// <param name="glyphInfos">The list of glyphs.</param>
+        /// <param name="baselineOrigin">The baseline origin of the run. Can be null.</param>
+        /// <returns>An <see cref="IGlyphRunImpl"/>.</returns>
+        IGlyphRunImpl CreateGlyphRun(IGlyphTypeface glyphTypeface, double fontRenderingEmSize, IReadOnlyList<GlyphInfo> glyphInfos, Point baselineOrigin);
 
+        /// <summary>
+        /// Creates a backend-specific object using a low-level API graphics context
+        /// </summary>
+        /// <param name="graphicsApiContext">An underlying low-level graphics context (e. g. wrapped OpenGL context, Vulkan device, D3DDevice, etc)</param>
+        /// <returns></returns>
+        IPlatformRenderInterfaceContext CreateBackendContext(IPlatformGraphicsContext? graphicsApiContext);
+        
         /// <summary>
         /// Gets a value indicating whether the platform directly supports rectangles with rounded corners.
         /// </summary>
@@ -199,5 +197,25 @@ namespace Avalonia.Platform
         /// Default <see cref="PixelFormat"/> used on this platform.
         /// </summary>
         public PixelFormat DefaultPixelFormat { get; }
+
+        bool IsSupportedBitmapPixelFormat(PixelFormat format);
+    }
+
+    [Unstable]
+    public interface IPlatformRenderInterfaceContext : IOptionalFeatureProvider, IDisposable
+    {
+        /// <summary>
+        /// Creates a renderer.
+        /// </summary>
+        /// <param name="surfaces">
+        /// The list of native platform surfaces that can be used for output.
+        /// </param>
+        /// <returns>An <see cref="IRenderTarget"/>.</returns>
+        IRenderTarget CreateRenderTarget(IEnumerable<object> surfaces);
+        
+        /// <summary>
+        /// Indicates that the context is no longer usable. This method should be thread-safe
+        /// </summary>
+        bool IsLost { get; }
     }
 }

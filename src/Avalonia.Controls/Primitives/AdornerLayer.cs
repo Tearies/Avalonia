@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Specialized;
 using Avalonia.Media;
-using Avalonia.Rendering;
+using Avalonia.Reactive;
 using Avalonia.VisualTree;
 
 namespace Avalonia.Controls.Primitives
@@ -13,7 +13,7 @@ namespace Avalonia.Controls.Primitives
     /// <remarks>
     /// TODO: Need to track position of adorned elements and move the adorner if they move.
     /// </remarks>
-    public class AdornerLayer : Canvas, ICustomSimpleHitTest
+    public class AdornerLayer : Canvas
     {
         /// <summary>
         /// Allows for getting and setting of the adorned element.
@@ -33,8 +33,14 @@ namespace Avalonia.Controls.Primitives
         public static readonly AttachedProperty<Control?> AdornerProperty =
             AvaloniaProperty.RegisterAttached<AdornerLayer, Visual, Control?>("Adorner");
 
-        private static readonly AttachedProperty<AdornedElementInfo> s_adornedElementInfoProperty =
-            AvaloniaProperty.RegisterAttached<AdornerLayer, Visual, AdornedElementInfo>("AdornedElementInfo");
+        /// <summary>
+        /// Defines the <see cref="DefaultFocusAdorner"/> property.
+        /// </summary>
+        public static readonly StyledProperty<ITemplate<Control>?> DefaultFocusAdornerProperty =
+            AvaloniaProperty.Register<AdornerLayer, ITemplate<Control>?>(nameof(DefaultFocusAdorner));
+        
+        private static readonly AttachedProperty<AdornedElementInfo?> s_adornedElementInfoProperty =
+            AvaloniaProperty.RegisterAttached<AdornerLayer, Visual, AdornedElementInfo?>("AdornedElementInfo");
 
         private static readonly AttachedProperty<AdornerLayer?> s_savedAdornerLayerProperty =
             AvaloniaProperty.RegisterAttached<Visual, Visual, AdornerLayer?>("SavedAdornerLayer");
@@ -60,7 +66,7 @@ namespace Avalonia.Controls.Primitives
             adorner.SetValue(AdornedElementProperty, adorned);
         }
 
-        public static AdornerLayer? GetAdornerLayer(IVisual visual)
+        public static AdornerLayer? GetAdornerLayer(Visual visual)
         {
             return visual.FindAncestorOfType<VisualLayerManager>()?.AdornerLayer;
         }
@@ -85,6 +91,15 @@ namespace Avalonia.Controls.Primitives
             visual.SetValue(AdornerProperty, adorner);
         }
 
+        /// <summary>
+        /// Gets or sets the default control's focus adorner.
+        /// </summary>
+        public ITemplate<Control>? DefaultFocusAdorner
+        {
+            get => GetValue(DefaultFocusAdornerProperty);
+            set => SetValue(DefaultFocusAdornerProperty, value);
+        }
+        
         private static void AdornerChanged(AvaloniaPropertyChangedEventArgs<Control?> e)
         {
             if (e.Sender is Visual visual)
@@ -158,8 +173,8 @@ namespace Avalonia.Controls.Primitives
                 return;
             }
 
-            AdornerLayer.SetAdornedElement(adorner, visual);
-            AdornerLayer.SetIsClipEnabled(adorner, false);
+            SetAdornedElement(adorner, visual);
+            SetIsClipEnabled(adorner, false);
 
             ((ISetLogicalParent) adorner).SetParent(visual);
             layer.Children.Add(adorner);
@@ -176,6 +191,7 @@ namespace Avalonia.Controls.Primitives
             ((ISetLogicalParent) adorner).SetParent(null);
         }
 
+        /// <inheritdoc />
         protected override Size MeasureOverride(Size availableSize)
         {
             foreach (var child in Children)
@@ -198,6 +214,7 @@ namespace Avalonia.Controls.Primitives
             return default;
         }
 
+        /// <inheritdoc />
         protected override Size ArrangeOverride(Size finalSize)
         {
             foreach (var child in Children)
@@ -216,7 +233,7 @@ namespace Avalonia.Controls.Primitives
                     }
                     else
                     {
-                        ArrangeChild((Control) child, finalSize);
+                        ArrangeChild(child, finalSize);
                     }
                 }
             }
@@ -232,7 +249,7 @@ namespace Avalonia.Controls.Primitives
             layer?.UpdateAdornedElement(adorner, adorned);
         }
 
-        private void UpdateClip(IControl control, TransformedBounds bounds, bool isEnabled)
+        private void UpdateClip(Control control, TransformedBounds bounds, bool isEnabled)
         {
             if (!isEnabled)
             {
@@ -276,8 +293,11 @@ namespace Avalonia.Controls.Primitives
         private void UpdateAdornedElement(Visual adorner, Visual? adorned)
         {
             if (adorner.CompositionVisual != null)
+            {
                 adorner.CompositionVisual.AdornedVisual = adorned?.CompositionVisual;
-            
+                adorner.CompositionVisual.AdornerIsClipped = GetIsClipEnabled(adorner);
+            }
+
             var info = adorner.GetValue(s_adornedElementInfoProperty);
 
             if (info != null)
@@ -304,16 +324,8 @@ namespace Avalonia.Controls.Primitives
                         info.Bounds = new TransformedBounds(new Rect(adorned.Bounds.Size), new Rect(adorned.Bounds.Size), Matrix.Identity);
                         InvalidateMeasure();
                     });
-                else
-                    info.Subscription = adorned.GetObservable(TransformedBoundsProperty).Subscribe(x =>
-                    {
-                        info.Bounds = x;
-                        InvalidateMeasure();
-                    });
             }
         }
-
-        public bool HitTest(Point point) => Children.HitTestCustom(point);
 
         private class AdornedElementInfo
         {

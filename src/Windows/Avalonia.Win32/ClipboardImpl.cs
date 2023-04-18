@@ -1,6 +1,6 @@
 using System;
 using System.Linq;
-using System.Reactive.Disposables;
+using Avalonia.Reactive;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Avalonia.Input;
@@ -16,7 +16,7 @@ namespace Avalonia.Win32
         private const int OleRetryCount = 10;
         private const int OleRetryDelay = 100;
 
-        private async Task<IDisposable> OpenClipboard()
+        private static async Task<IDisposable> OpenClipboard()
         {
             var i = OleRetryCount;
 
@@ -30,7 +30,7 @@ namespace Avalonia.Win32
             return Disposable.Create(() => UnmanagedMethods.CloseClipboard());
         }
 
-        public async Task<string> GetTextAsync()
+        public async Task<string?> GetTextAsync()
         {
             using(await OpenClipboard())
             {
@@ -52,19 +52,17 @@ namespace Avalonia.Win32
             }
         }
 
-        public async Task SetTextAsync(string text)
+        public async Task SetTextAsync(string? text)
         {
-            if (text == null)
-            {
-                throw new ArgumentNullException(nameof(text));
-            }
-
             using(await OpenClipboard())
             {
                 UnmanagedMethods.EmptyClipboard();
 
-                var hGlobal = Marshal.StringToHGlobalUni(text);
-                UnmanagedMethods.SetClipboardData(UnmanagedMethods.ClipboardFormat.CF_UNICODETEXT, hGlobal);
+                if (text is not null)
+                {
+                    var hGlobal = Marshal.StringToHGlobalUni(text);
+                    UnmanagedMethods.SetClipboardData(UnmanagedMethods.ClipboardFormat.CF_UNICODETEXT, hGlobal);
+                }
             }
         }
 
@@ -121,7 +119,7 @@ namespace Avalonia.Win32
             }
         }
 
-        public async Task<object> GetDataAsync(string format)
+        public async Task<object?> GetDataAsync(string format)
         {
             Dispatcher.UIThread.VerifyAccess();
             var i = OleRetryCount;

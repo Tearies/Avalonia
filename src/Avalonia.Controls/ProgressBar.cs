@@ -1,9 +1,12 @@
 using System;
+using Avalonia.Automation.Peers;
+using Avalonia.Controls.Automation.Peers;
 using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Reactive;
 
 namespace Avalonia.Controls
 {
@@ -97,8 +100,6 @@ namespace Avalonia.Controls
         }
 
         private double _percentage;
-        private double _indeterminateStartingOffset;
-        private double _indeterminateEndingOffset;
         private Border? _indicator;
         private IDisposable? _trackSizeChangedListener;
 
@@ -119,17 +120,11 @@ namespace Avalonia.Controls
                 nameof(Percentage),
                 o => o.Percentage);
 
-        public static readonly DirectProperty<ProgressBar, double> IndeterminateStartingOffsetProperty =
-            AvaloniaProperty.RegisterDirect<ProgressBar, double>(
-                nameof(IndeterminateStartingOffset),
-                p => p.IndeterminateStartingOffset,
-                (p, o) => p.IndeterminateStartingOffset = o);
+        public static readonly StyledProperty<double> IndeterminateStartingOffsetProperty =
+            AvaloniaProperty.Register<ProgressBar, double>(nameof(IndeterminateStartingOffset));
 
-        public static readonly DirectProperty<ProgressBar, double> IndeterminateEndingOffsetProperty =
-            AvaloniaProperty.RegisterDirect<ProgressBar, double>(
-                nameof(IndeterminateEndingOffset),
-                p => p.IndeterminateEndingOffset,
-                (p, o) => p.IndeterminateEndingOffset = o);
+        public static readonly StyledProperty<double> IndeterminateEndingOffsetProperty =
+            AvaloniaProperty.Register<ProgressBar, double>(nameof(IndeterminateEndingOffset));
 
         public double Percentage
         {
@@ -139,19 +134,19 @@ namespace Avalonia.Controls
 
         public double IndeterminateStartingOffset
         {
-            get => _indeterminateStartingOffset;
-            set => SetAndRaise(IndeterminateStartingOffsetProperty, ref _indeterminateStartingOffset, value);
+            get => GetValue(IndeterminateStartingOffsetProperty);
+            set => SetValue(IndeterminateStartingOffsetProperty, value);
         }
 
         public double IndeterminateEndingOffset
         {
-            get => _indeterminateEndingOffset;
-            set => SetAndRaise(IndeterminateEndingOffsetProperty, ref _indeterminateEndingOffset, value);
+            get => GetValue(IndeterminateEndingOffsetProperty);
+            set => SetValue(IndeterminateEndingOffsetProperty, value);
         }
 
         static ProgressBar()
         {
-            ValueProperty.OverrideMetadata<ProgressBar>(new DirectPropertyMetadata<double>(defaultBindingMode: BindingMode.OneWay));
+            ValueProperty.OverrideMetadata<ProgressBar>(new(defaultBindingMode: BindingMode.OneWay));
             ValueProperty.Changed.AddClassHandler<ProgressBar>((x, e) => x.UpdateIndicatorWhenPropChanged(e));
             MinimumProperty.Changed.AddClassHandler<ProgressBar>((x, e) => x.UpdateIndicatorWhenPropChanged(e));
             MaximumProperty.Changed.AddClassHandler<ProgressBar>((x, e) => x.UpdateIndicatorWhenPropChanged(e));
@@ -227,10 +222,15 @@ namespace Avalonia.Controls
             UpdateIndicator();
         }
 
+        protected override AutomationPeer OnCreateAutomationPeer()
+        {
+            return new ProgressBarAutomationPeer(this);
+        }
+
         private void UpdateIndicator()
         {
             // Gets the size of the parent indicator container
-            var barSize = _indicator?.Parent?.Bounds.Size ?? Bounds.Size;
+            var barSize = _indicator?.VisualParent?.Bounds.Size ?? Bounds.Size;
 
             if (_indicator != null)
             {
@@ -253,8 +253,8 @@ namespace Avalonia.Controls
 
 
                     // Remove these properties when we switch to fluent as default and removed the old one.
-                    IndeterminateStartingOffset = -dim;
-                    IndeterminateEndingOffset = dim;
+                    SetCurrentValue(IndeterminateStartingOffsetProperty,-dim);
+                    SetCurrentValue(IndeterminateEndingOffsetProperty,dim);
 
                     var padding = Padding;
                     var rectangle = new RectangleGeometry(
@@ -270,15 +270,16 @@ namespace Avalonia.Controls
                     double percent = Maximum == Minimum ? 1.0 : (Value - Minimum) / (Maximum - Minimum);
 
                     // When the Orientation changed, the indicator's Width or Height should set to double.NaN.
+                    // Indicator size calculation should consider the ProgressBar's Padding property setting
                     if (Orientation == Orientation.Horizontal)
                     {
-                        _indicator.Width = barSize.Width * percent;
+                        _indicator.Width = (barSize.Width - _indicator.Margin.Left - _indicator.Margin.Right) * percent;
                         _indicator.Height = double.NaN;
                     }
                     else
                     {
                         _indicator.Width = double.NaN;
-                        _indicator.Height = barSize.Height * percent;
+                        _indicator.Height = (barSize.Height - _indicator.Margin.Top - _indicator.Margin.Bottom) * percent;
                     }
 
 

@@ -1,16 +1,11 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Threading;
-
-using Avalonia.Controls.Platform.Surfaces;
 using Avalonia.Media;
 using Avalonia.OpenGL;
-using Avalonia.OpenGL.Imaging;
 using Avalonia.Platform;
 using Avalonia.Media.Imaging;
+using Avalonia.Media.TextFormatting;
 using SkiaSharp;
 
 namespace Avalonia.Skia
@@ -18,31 +13,38 @@ namespace Avalonia.Skia
     /// <summary>
     /// Skia platform render interface.
     /// </summary>
-    internal class PlatformRenderInterface : IPlatformRenderInterface, IOpenGlAwarePlatformRenderInterface
+    internal class PlatformRenderInterface : IPlatformRenderInterface
     {
-        private readonly ISkiaGpu _skiaGpu;
+        private readonly long? _maxResourceBytes;
 
-        public PlatformRenderInterface(ISkiaGpu skiaGpu, long? maxResourceBytes = null)
+        public PlatformRenderInterface(long? maxResourceBytes = null)
         {
+            _maxResourceBytes = maxResourceBytes;
             DefaultPixelFormat = SKImageInfo.PlatformColorType.ToPixelFormat();
-
-            if (skiaGpu != null)
-            {
-                _skiaGpu = skiaGpu;
-                return;
-            }
-
-            var gl = AvaloniaLocator.Current.GetService<IPlatformOpenGlInterface>();
-            if (gl != null)
-                _skiaGpu = new GlSkiaGpu(gl, maxResourceBytes);
         }
 
+
+        public IPlatformRenderInterfaceContext CreateBackendContext(IPlatformGraphicsContext? graphicsContext)
+        {
+            if (graphicsContext == null)
+                return new SkiaContext(null);
+            if (graphicsContext is ISkiaGpu skiaGpu)
+                return new SkiaContext(skiaGpu);
+            if (graphicsContext is IGlContext gl)
+                return new SkiaContext(new GlSkiaGpu(gl, _maxResourceBytes));
+            throw new ArgumentException("Graphics context of type is not supported");
+        }
 
         public bool SupportsIndividualRoundRects => true;
 
         public AlphaFormat DefaultAlphaFormat => AlphaFormat.Premul;
 
         public PixelFormat DefaultPixelFormat { get; }
+
+        public bool IsSupportedBitmapPixelFormat(PixelFormat format) =>
+            format == PixelFormats.Rgb565
+            || format == PixelFormats.Bgra8888
+            || format == PixelFormats.Rgba8888;
 
         public IGeometryImpl CreateEllipseGeometry(Rect rect) => new EllipseGeometryImpl(rect);
 
@@ -56,14 +58,14 @@ namespace Avalonia.Skia
             return new StreamGeometryImpl();
         }
 
-        public IGeometryImpl CreateGeometryGroup(FillRule fillRule, IReadOnlyList<Geometry> children)
+        public IGeometryImpl CreateGeometryGroup(FillRule fillRule, IReadOnlyList<IGeometryImpl> children)
         {
             return new GeometryGroupImpl(fillRule, children);
         }
 
-        public IGeometryImpl CreateCombinedGeometry(GeometryCombineMode combineMode, Geometry g1, Geometry g2)
+        public IGeometryImpl CreateCombinedGeometry(GeometryCombineMode combineMode, IGeometryImpl g1, IGeometryImpl g2)
         {
-            return new CombinedGeometryImpl(combineMode, g1, g2);
+            return CombinedGeometryImpl.ForceCreate(combineMode, g1, g2);
         }
 
         public IGeometryImpl BuildGlyphRunGeometry(GlyphRun glyphRun)
@@ -74,21 +76,22 @@ namespace Avalonia.Skia
             }
 
             var fontRenderingEmSize = (float)glyphRun.FontRenderingEmSize;
-            var skFont = new SKFont(glyphTypeface.Typeface, fontRenderingEmSize)
-            {
-                Size = fontRenderingEmSize,
-                Edging = SKFontEdging.Alias,
-                Hinting = SKFontHinting.None,
-                LinearMetrics = true
-            };
+
+            var skFont = SKFontCache.Shared.Get();
+
+            skFont.Typeface = glyphTypeface.Typeface;
+            skFont.Size = fontRenderingEmSize;
+            skFont.Edging = SKFontEdging.Alias;
+            skFont.Hinting = SKFontHinting.None;
+            skFont.LinearMetrics = true;
 
             SKPath path = new SKPath();
 
             var (currentX, currentY) = glyphRun.BaselineOrigin;
 
-            for (var i = 0; i < glyphRun.GlyphIndices.Count; i++)
+            for (var i = 0; i < glyphRun.GlyphInfos.Count; i++)
             {
-                var glyph = glyphRun.GlyphIndices[i];
+                var glyph = glyphRun.GlyphInfos[i].GlyphIndex;
                 var glyphPath = skFont.GetGlyphPath(glyph);
 
                 if (!glyphPath.IsEmpty)
@@ -96,17 +99,12 @@ namespace Avalonia.Skia
                     path.AddPath(glyphPath, (float)currentX, (float)currentY);
                 }
 
-                if (glyphRun.GlyphAdvances != null)
-                {
-                    currentX += glyphRun.GlyphAdvances[i];
-                }
-                else
-                {
-                    currentX += glyphPath.Bounds.Right;
-                }
+                currentX += glyphRun.GlyphInfos[i].GlyphAdvance;
             }
 
-            return new StreamGeometryImpl(path);
+            SKFontCache.Shared.Return(skFont);
+
+            return new StreamGeometryImpl(path, path);
         }
 
         /// <inheritdoc />
@@ -206,127 +204,72 @@ namespace Avalonia.Skia
         }
 
         /// <inheritdoc />
-        public IRenderTarget CreateRenderTarget(IEnumerable<object> surfaces)
-        {
-            if (!(surfaces is IList))
-                surfaces = surfaces.ToList();
-            var gpuRenderTarget = _skiaGpu?.TryCreateRenderTarget(surfaces);
-            if (gpuRenderTarget != null)
-            {
-                return new SkiaGpuRenderTarget(_skiaGpu, gpuRenderTarget);
-            }
-
-            foreach (var surface in surfaces)
-            {
-                if (surface is IFramebufferPlatformSurface framebufferSurface)
-                    return new FramebufferRenderTarget(framebufferSurface);
-            }
-
-            throw new NotSupportedException(
-                "Don't know how to create a Skia render target from any of provided surfaces");
-        }
-
-        /// <inheritdoc />
         public IWriteableBitmapImpl CreateWriteableBitmap(PixelSize size, Vector dpi, PixelFormat format, AlphaFormat alphaFormat)
         {
             return new WriteableBitmapImpl(size, dpi, format, alphaFormat);
         }
 
-        public IOpenGlBitmapImpl CreateOpenGlBitmap(PixelSize size, Vector dpi)
-        {
-            if (_skiaGpu is IOpenGlAwareSkiaGpu glAware)
-                return glAware.CreateOpenGlBitmap(size, dpi);
-            if (_skiaGpu == null)
-                throw new PlatformNotSupportedException("GPU acceleration is not available");
-            throw new PlatformNotSupportedException(
-                "Current GPU acceleration backend does not support OpenGL integration");
-        }
-
-        public IGlyphRunImpl CreateGlyphRun(IGlyphTypeface glyphTypeface, double fontRenderingEmSize, IReadOnlyList<ushort> glyphIndices,
-            IReadOnlyList<double> glyphAdvances, IReadOnlyList<Vector> glyphOffsets)
+        public IGlyphRunImpl CreateGlyphRun(
+            IGlyphTypeface glyphTypeface,
+            double fontRenderingEmSize, 
+            IReadOnlyList<GlyphInfo> glyphInfos,
+            Point baselineOrigin)
         {
             if (glyphTypeface == null)
             {
                 throw new ArgumentNullException(nameof(glyphTypeface));
             }
 
-            if (glyphIndices == null)
+            if (glyphInfos == null)
             {
-                throw new ArgumentNullException(nameof(glyphIndices));
+                throw new ArgumentNullException(nameof(glyphInfos));
             }
 
-            var glyphTypefaceImpl = glyphTypeface as GlyphTypefaceImpl;
+            var glyphTypefaceImpl = (GlyphTypefaceImpl)glyphTypeface;
 
-            var font = new SKFont
+            var font = SKFontCache.Shared.Get();
+
+            font.LinearMetrics = true;
+            font.Subpixel = true;
+            font.Edging = SKFontEdging.SubpixelAntialias;
+            font.Hinting = SKFontHinting.Full;
+            font.Size = (float)fontRenderingEmSize;
+            font.Typeface = glyphTypefaceImpl.Typeface;
+            font.Embolden = (glyphTypefaceImpl.FontSimulations & FontSimulations.Bold) != 0;
+            font.SkewX = (glyphTypefaceImpl.FontSimulations & FontSimulations.Oblique) != 0 ? -0.2f : 0;
+
+
+            var builder = SKTextBlobBuilderCache.Shared.Get();
+            var count = glyphInfos.Count;
+
+            var runBuffer = builder.AllocatePositionedRun(font, count);
+
+            var glyphSpan = runBuffer.GetGlyphSpan();
+            var positionSpan = runBuffer.GetPositionSpan();
+
+            SKFontCache.Shared.Return(font);
+
+            var width = 0.0;
+
+            for (int i = 0; i < count; i++)
             {
-                LinearMetrics = true,
-                Subpixel = true,
-                Edging = SKFontEdging.SubpixelAntialias,
-                Hinting = SKFontHinting.Full,
-                Size = (float)fontRenderingEmSize,
-                Typeface = glyphTypefaceImpl.Typeface,
-                Embolden = (glyphTypefaceImpl.FontSimulations & FontSimulations.Bold) != 0,
-                SkewX = (glyphTypefaceImpl.FontSimulations & FontSimulations.Oblique) != 0 ? -0.2f : 0
-            };
+                var glyphInfo = glyphInfos[i];
+                var offset = glyphInfo.GlyphOffset;
 
-            var builder = new SKTextBlobBuilder();
+                glyphSpan[i] = glyphInfo.GlyphIndex;
 
-            var count = glyphIndices.Count;
+                positionSpan[i] = new SKPoint((float)(width + offset.X), (float)offset.Y);
 
-            if (glyphOffsets != null && glyphAdvances != null)
-            {
-                var runBuffer = builder.AllocatePositionedRun(font, count);
-
-                var glyphSpan = runBuffer.GetGlyphSpan();
-                var positionSpan = runBuffer.GetPositionSpan();
-
-                var currentX = 0.0;
-
-                for (int i = 0; i < glyphOffsets.Count; i++)
-                {
-                    var offset = glyphOffsets[i];
-
-                    glyphSpan[i] = glyphIndices[i];
-
-                    positionSpan[i] = new SKPoint((float)(currentX + offset.X), (float)offset.Y);
-
-                    currentX += glyphAdvances[i];
-                }
-            }
-            else
-            {
-                if (glyphAdvances != null)
-                {
-                    var runBuffer = builder.AllocateHorizontalRun(font, count, 0);
-
-                    var glyphSpan = runBuffer.GetGlyphSpan();
-                    var positionSpan = runBuffer.GetPositionSpan();
-
-                    var currentX = 0.0;
-
-                    for (int i = 0; i < glyphAdvances.Count; i++)
-                    {
-                        glyphSpan[i] = glyphIndices[i];
-
-                        positionSpan[i] = (float)currentX;
-
-                        currentX += glyphAdvances[i];
-                    }
-                }
-                else
-                {
-                    var runBuffer = builder.AllocateRun(font, count, 0, 0);
-
-                    var glyphSpan = runBuffer.GetGlyphSpan();
-
-                    for (int i = 0; i < glyphIndices.Count; i++)
-                    {
-                        glyphSpan[i] = glyphIndices[i];
-                    }
-                }
+                width += glyphInfo.GlyphAdvance;
             }
 
-            return new GlyphRunImpl(builder.Build());
+            var scale = fontRenderingEmSize / glyphTypeface.Metrics.DesignEmHeight;
+            var height = glyphTypeface.Metrics.LineSpacing * scale;
+            var skTextBlob = builder.Build();
+
+            SKTextBlobBuilderCache.Shared.Return(builder);
+
+            return new GlyphRunImpl(skTextBlob, new Size(width, height), baselineOrigin);
         }
     }
 }

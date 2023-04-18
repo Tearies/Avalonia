@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.Serialization.Formatters.Binary;
 using Avalonia.Input;
-using Avalonia.MicroCom;
+using Avalonia.Platform.Storage.FileIO;
 using Avalonia.Utilities;
 using Avalonia.Win32.Interop;
 using MicroCom.Runtime;
@@ -34,22 +35,13 @@ namespace Avalonia.Win32
             return GetDataFormatsCore().Distinct();
         }
 
-        public string GetText()
-        {
-            return (string)GetDataFromOleHGLOBAL(DataFormats.Text, DVASPECT.DVASPECT_CONTENT);
-        }
-
-        public IEnumerable<string> GetFileNames()
-        {
-            return (IEnumerable<string>)GetDataFromOleHGLOBAL(DataFormats.FileNames, DVASPECT.DVASPECT_CONTENT);
-        }
-
-        public object Get(string dataFormat)
+        public object? Get(string dataFormat)
         {
             return GetDataFromOleHGLOBAL(dataFormat, DVASPECT.DVASPECT_CONTENT);
         }
 
-        private unsafe object GetDataFromOleHGLOBAL(string format, DVASPECT aspect)
+        [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "We still use BinaryFormatter for WinForms dragndrop compatability")]
+        private unsafe object? GetDataFromOleHGLOBAL(string format, DVASPECT aspect)
         {
             var formatEtc = new Interop.FORMATETC();
             formatEtc.cfFormat = ClipboardFormats.GetFormat(format);
@@ -66,8 +58,15 @@ namespace Avalonia.Win32
                     {
                         if (format == DataFormats.Text)
                             return ReadStringFromHGlobal(medium.unionmember);
+#pragma warning disable CS0618
                         if (format == DataFormats.FileNames)
+#pragma warning restore CS0618
                             return ReadFileNamesFromHGlobal(medium.unionmember);
+                        if (format == DataFormats.Files)
+                            return ReadFileNamesFromHGlobal(medium.unionmember)
+                                .Select(f => StorageProviderHelpers.TryCreateBclStorageItem(f)!)
+                                // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                                .Where(f => f is not null);
 
                         byte[] data = ReadBytesFromHGlobal(medium.unionmember);
 
@@ -77,7 +76,9 @@ namespace Avalonia.Win32
                             {
                                 ms.Position = DataObject.SerializedObjectGUID.Length;
                                 BinaryFormatter binaryFormatter = new BinaryFormatter();
+#pragma warning disable SYSLIB0011 // Type or member is obsolete
                                 return binaryFormatter.Deserialize(ms);
+#pragma warning restore SYSLIB0011 // Type or member is obsolete
                             }
                         }
                         return data;
@@ -96,7 +97,7 @@ namespace Avalonia.Win32
 
         private static IEnumerable<string> ReadFileNamesFromHGlobal(IntPtr hGlobal)
         {
-            List<string> files = new List<string>();
+            var files = new List<string>();
             int fileCount = UnmanagedMethods.DragQueryFile(hGlobal, -1, null, 0);
             if (fileCount > 0)
             {
@@ -114,7 +115,7 @@ namespace Avalonia.Win32
             return files;
         }
 
-        private static string ReadStringFromHGlobal(IntPtr hGlobal)
+        private static string? ReadStringFromHGlobal(IntPtr hGlobal)
         {
             IntPtr ptr = UnmanagedMethods.GlobalLock(hGlobal);
             try

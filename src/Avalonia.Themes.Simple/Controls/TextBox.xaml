@@ -13,15 +13,6 @@
               IsEnabled="{Binding $parent[TextBox].CanPaste}" InputGesture="{x:Static TextBox.PasteGesture}" />
   </MenuFlyout>
 
-  <ContextMenu x:Key="SimpleTextBoxContextMenu" x:Name="TextBoxContextMenu">
-    <MenuItem x:Name="TextBoxContextMenuCutItem" Header="Cut" Command="{Binding $parent[TextBox].Cut}"
-              IsEnabled="{Binding $parent[TextBox].CanCut}" InputGesture="{x:Static TextBox.CutGesture}" />
-    <MenuItem x:Name="TextBoxContextMenuCopyItem" Header="Copy" Command="{Binding $parent[TextBox].Copy}"
-              IsEnabled="{Binding $parent[TextBox].CanCopy}" InputGesture="{x:Static TextBox.CopyGesture}" />
-    <MenuItem x:Name="TextBoxContextMenuPasteItem" Header="Paste" Command="{Binding $parent[TextBox].Paste}"
-              IsEnabled="{Binding $parent[TextBox].CanPaste}" InputGesture="{x:Static TextBox.PasteGesture}" />
-  </ContextMenu>
-
   <ControlTheme x:Key="SimpleTextBoxClearButtonTheme"
                 BasedOn="{StaticResource {x:Type Button}}"
                 TargetType="Button">
@@ -92,6 +83,7 @@
     <Setter Property="CaretBrush" Value="{DynamicResource ThemeForegroundBrush}" />
     <Setter Property="Background" Value="{DynamicResource ThemeBackgroundBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderMidBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
     <Setter Property="BorderThickness" Value="{DynamicResource ThemeBorderThickness}" />
     <Setter Property="SelectionBrush" Value="{DynamicResource HighlightBrush}" />
     <Setter Property="SelectionForegroundBrush" Value="{DynamicResource HighlightForegroundBrush}" />
